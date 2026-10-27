@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=../../../.pipewright-schemas/usecase-part.schema.json
+data:
+  contract:
+    columns:
+      - { name: customer_id,       type: string,  required: true }
+      - { name: snapshot_date,     type: date,    required: true }
+      - { name: recency_days,      type: integer, min: 0 }
+      - { name: orders_12m,        type: integer, min: 0 }
+      - { name: spend_12m_gbp,     type: float,   min: 0 }
+      - { name: distinct_products, type: integer, min: 0 }
+      - { name: country,           type: string }
+      - { name: lapsed,            type: integer, allowed: [0, 1] }
+  label: { column: lapsed }
+  split: { strategy: time, time_column: snapshot_date }
+
+features:
+  exclude: [customer_id]
