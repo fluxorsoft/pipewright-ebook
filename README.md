@@ -7,6 +7,7 @@ for that chapter.
 ```
 environments/test.yaml     the test environment (the platform team's manifest, on Google Cloud)
 usecases/lapse-risk/       the lapse model: which customers will not buy again within 90 days
+reference/                 lapse-risk with every setting and its default, in one file (tools/all_settings.py)
 ```
 
 Start from Chapter 1 to build it yourself. To use your own Google Cloud project instead of the book's, build an

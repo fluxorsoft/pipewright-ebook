@@ -1,0 +1,229 @@
+# Every setting of lapse-risk, as `pipewright resolve --env test` runs it (Pipewright 1.1.0).
+# Unmarked: the team's own value, as written. `# default`: what Pipewright fills in when the key is left out.
+# `# environments/test.yaml`: set for this environment only.
+# The platform's values (runner, dataset, landing prefix) come from the environment manifest, not from here.
+# Written by tools/all_settings.py. `pipewright explain <key>` explains any key.
+apiVersion: pipewright/v1
+kind: UseCase
+metadata:
+  name: lapse-risk
+  owner: ml-team
+spec:
+  tenant: retail
+  pipelines:
+    training:
+      file: training_pipeline.py
+      function: churn_training_pipeline
+  components:
+    dir: components/
+    requirements: components/requirements.txt
+  framework: pytorch  # default
+  triggers:
+    # landing:  # not set by default
+    schedules: []  # default
+    api: true
+  parameters:
+    bq_dataset: ${resources.bigquery_dataset}
+    model_display_name: ${model.name}
+    raw_table: lapse_risk_raw_customers
+    metrics_table: lapse_risk_model_metrics
+  steps: {}  # default
+  data:
+    contract:
+      min_rows: 1000
+      unique: [customer_id, snapshot_date]
+      allow_extra_columns: false
+      columns:
+        - {name: customer_id, type: string, required: true, max_null_fraction: 0}
+        - {name: snapshot_date, type: date, required: true, max_null_fraction: 0}
+        - {name: recency_days, type: integer, min: 0, max: 365}
+        - {name: orders_12m, type: integer, min: 1}
+        - {name: spend_12m_gbp, type: float, min: 0}
+        - {name: distinct_products, type: integer, min: 1}
+        - {name: country, type: string, max_null_fraction: 0.01}
+        - {name: returned, type: integer, allowed: [0, 1], max_null_fraction: 0}
+    label:
+      column: returned
+    split:
+      strategy: time
+      time_column: snapshot_date
+      test_fraction: 0.2  # default
+      validation_fraction: 0.0  # default
+      seed: 42  # default
+    features_from:
+      entity:
+        columns: [customer_id]
+        time_column: snapshot_date
+      sources:
+        - {table: 'bq://pw_retail.customer_activity', features: [recency_days, orders_12m, spend_12m_gbp, distinct_products]}
+    label_source:
+      table: bq://pw_retail.customer_purchases
+      time_column: purchased_at
+      window_days: 90
+      key: [customer_id]  # default
+      cutoff_column: snapshot_date  # default
+    snapshot_table: lapse_risk_snapshots
+  features:
+    include: [recency_days, orders_12m, spend_12m_gbp, distinct_products]  # default
+    exclude: [customer_id, country]
+  training:  # default
+    hyperparameters: {}  # default
+    seed: 42  # default
+    experiment:  # default
+      name: lapse-risk  # default
+    tuning:  # default
+      enabled: false  # default
+      metric: auc  # default
+      goal: maximize  # default
+      max_trials: 8  # default
+      parallel_trials: 4  # default
+      search_space: {}  # default
+  evaluation:
+    primary_metric: auc  # default
+    decision_threshold: 0.5  # default
+    metrics: [accuracy, auc, calibration_error, f1, log_loss, pr_auc, precision, recall]  # default
+    gates:
+      - {metric: auc, min: 0.7}
+    champion:  # default
+      enabled: true  # default
+      metric: auc  # default
+      min_improvement: 0.0  # default
+    slices: []  # default
+    slice_gates: []  # default
+  explainability:  # default
+    enabled: false  # default
+    method: permutation  # default
+    top_k: 10  # default
+  registry:  # default
+    set_default: on_approval  # default
+  model_card: {}  # default
+  inference:  # default
+    # output_table:  # not set by default
+    decision_threshold: 0.5  # default
+  monitoring:  # default
+    drift:  # default
+      enabled: false  # default
+      method: psi  # default
+      threshold: 0.2  # default
+      features: [recency_days, orders_12m, spend_12m_gbp, distinct_products]  # default
+    prediction_drift:  # default
+      enabled: false  # default
+      threshold: 0.2  # default
+    performance:  # default
+      enabled: false  # default
+      # labels:  # not set by default
+      metric: auc  # default
+      # min:  # not set by default
+    # output_table:  # not set by default
+    alerts:  # default
+      notify: []  # default
+      events: [monitoring.alert]  # default
+      severity: WARNING  # default
+  retraining:  # default
+    mode: 'off'  # default
+    enabled: false  # default
+    when: [schedule]  # default
+    cooldown_days: 7  # default
+    # source_uri:  # not set by default
+    decisions:  # default
+      notify: []  # default
+      publish: false  # default
+      escalate_after_days: 3  # default
+      escalate_notify: []  # default
+      digest: true  # default
+    approvals:  # default
+      required: []  # default
+      separate_from_requester: true  # default
+    snooze:  # default
+      max_days: 30  # default
+      reopen_when_worse_by: 0.1  # default
+  data_protection:  # default
+    personal_data_columns: []  # default
+    # erasure:  # not set by default
+  outputs:
+    store: bigquery  # default
+    # gcs:  # not set by default
+    bigquery:
+      tables:
+        lapse_risk_raw_customers:
+          schema: schemas/raw_customers.json
+          partition:
+            field: ingested_at
+            type: DAY
+          # cluster:  # not set by default
+        lapse_risk_model_metrics:
+          schema: schemas/model_metrics.json
+          partition:
+            field: evaluated_at
+            type: DAY
+          # cluster:  # not set by default
+        lapse_risk_snapshots:
+          schema: schemas/snapshots.json
+          partition:
+            field: ingested_at
+            type: DAY
+          # cluster:  # not set by default
+      # retention_days:  # not set by default
+  model:
+    promotion: model  # default
+    name: lapse-risk-classifier
+    serving:  # default
+      enabled: false  # default
+      target: vertex  # default
+      machine: n1-standard-2  # default
+      replicas:  # default
+        min: 1  # default
+        max: 1  # default
+  approvals:
+    promote_model: auto  # environments/test.yaml
+    deploy_model: manual  # default
+    approvers: []  # default
+
+# Also available, not used by this use case (`pipewright explain <key>` for each):
+#   bqml (21 keys): BigQuery ML as the training engine
+#   components.ray_requirements: Extra packages for the use case's Ray image (the clusters' nodes), such as torch
+#   data.contract.max_null_fraction: The largest share of empty values allowed in any column, 0 to 1
+#   data.features_from.sources.entity_columns: The table's entity columns, in the order of entity.columns, when their names ...
+#   data.features_from.sources.feature_group: A feature group registered in the Agent Platform Feature Store, instead of a ...
+#   data.features_from.sources.online_view: The feature view in the tenant's online store that serves this source's ...
+#   data.features_from.sources.prefix: Added to this table's feature names, when two tables have a feature of the same ...
+#   data.features_from.sources.project: The project the feature group is registered in
+#   data.features_from.sources.region: The region the feature group is registered in
+#   data.features_from.sources.time_column: The table's column saying when each value became true
+#   data.label.positive: The value that counts as positive for metrics such as precision and recall
+#   data.label.task: What the model predicts: binary (the default), multiclass or regression; with ...
+#   data.label.values: The label's possible values, for example [0, 1]
+#   data_protection.erasure.key_column: The column that identifies a data subject, such as customer_id
+#   environments: Per-environment overrides, by environment name
+#   evaluation.fairness (6 keys): Bias measures per attribute on the test set (binary classification, Pipewright ...
+#   evaluation.gates.max: The highest value allowed
+#   evaluation.slice_gates.max_gap: The largest amount a slice may be worse than overall
+#   evaluation.slice_gates.metric: The metric compared per slice
+#   evaluation.slice_gates.min_rows: Slices with fewer test rows are not checked
+#   include: Glob patterns, relative to the use case folder, of files that hold the rest of ...
+#   model.serving.canary_percent: The share of traffic a new version gets with `deploy-model --canary`
+#   model.serving.features: online: the endpoint takes entity IDs (data.features_from.entity.columns) and ...
+#   model_card.ethical_considerations: Fairness and other risks, and how they are handled
+#   model_card.intended_use: What the model is for and who uses its output
+#   model_card.limitations: Known weaknesses, such as data it has not seen
+#   model_card.out_of_scope: Uses the model is not suitable for
+#   monitoring.performance.labels.key: The column that joins outcomes to predictions
+#   monitoring.performance.labels.label: The column holding the observed outcome
+#   monitoring.performance.labels.table: The table of observed outcomes
+#   outputs.gcs.external_tables: Whether BigQuery external tables of the same names are created over the files, ...
+#   outputs.gcs.format: The file format
+#   pipelines.inference (2 keys): The pipeline that scores new data with the champion model
+#   retraining.loop (1 key): The closed retrain loop: production never trains
+#   run_in: The environments this use case runs in, by name (Pipewright 1.1), for a use ...
+#   steps.<name> (15 keys): A step, by its component name with dashes (train-model for train_model)
+#   synthetic (67 keys): Synthetic data generation
+#   tests (1 key): How `pipewright test` and the release check the use case's code
+#   training.hyperparameters.<name>: A hyperparameter value
+#   training.tuning.search_space.<name> (5 keys): One hyperparameter's range
+#   triggers.landing.pipeline: The pipeline a landed file starts
+#   triggers.landing.suffixes: File name endings that start a run when a file lands under the use case's ...
+#   triggers.schedules.cron: When it runs, in cron syntax, for example "0 6 * * *" (06:00 every day)
+#   triggers.schedules.name: The schedule's name, unique in the use case
+#   triggers.schedules.pipeline: The pipeline the schedule starts
+#   triggers.schedules.source_uri: The gs:// data the scheduled run reads
+#   triggers.schedules.timezone: The time zone the cron expression is read in, for example Europe/London
