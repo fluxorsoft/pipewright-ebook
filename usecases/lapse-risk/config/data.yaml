@@ -1,5 +1,6 @@
 # yaml-language-server: $schema=../../../.pipewright-schemas/usecase-part.schema.json
-# The data contract: what a training file must look like. A file that breaks it stops the run before training.
+# The data contract: what the model's data must look like, whichever table each column comes from. Data that
+# breaks it stops the run before training.
 data:
   contract:
     min_rows: 1000                       # a near-empty export is a failed export
@@ -16,6 +17,11 @@ data:
       - { name: lapsed,            type: integer, allowed: [0, 1], max_null_fraction: 0 }
   label: { column: lapsed }              # 1: no purchase in the 90 days after the cut-off
   split: { strategy: time, time_column: snapshot_date }
+  features_from:                         # the run's source is the entity table: who, as of when, and the label
+    entity: { columns: [customer_id], time_column: snapshot_date }
+    sources:
+      - table: bq://pw_retail.customer_activity          # the data team's feature table, one row per month
+        features: [recency_days, orders_12m, spend_12m_gbp, distinct_products]
 
 features:
   exclude: [customer_id, country]        # country stays in the contract (and comes back in Chapter 10), not a feature

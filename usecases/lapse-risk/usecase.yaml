@@ -20,8 +20,7 @@ spec:
     name: lapse-risk-classifier
 
   triggers:
-    landing: { suffixes: [.csv], pipeline: training }   # a CSV under your landing prefix trains
-    api: true                            # or `pipewright run --source-uri gs://... or bq://...`
+    api: true                            # `pipewright run --source-uri bq://<entity table>`; a file cannot be one
 
   parameters:                            # the training pipeline's own parameters
     bq_dataset: ${resources.bigquery_dataset}
