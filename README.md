@@ -1,6 +1,6 @@
 # retailer-mlops
 
-The MLOps repository of the UK online gift retailer in *MLOps on Google Cloud*, built with Pipewright
+The MLOps repository of the UK online gift retailer in *Governed MLOps on Google Cloud*, built with Pipewright
 1.1.0. Each chapter's **Try it** section changes this repository; its state after each chapter is what readers get
 for that chapter.
 
