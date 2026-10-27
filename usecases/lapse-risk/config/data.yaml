@@ -1,17 +1,21 @@
 # yaml-language-server: $schema=../../../.pipewright-schemas/usecase-part.schema.json
+# The data contract: what a training file must look like. A file that breaks it stops the run before training.
 data:
   contract:
+    min_rows: 1000                       # a near-empty export is a failed export
+    unique: [customer_id, snapshot_date] # one row per customer per cut-off
+    allow_extra_columns: false           # an unknown column means the export changed: stop and ask
     columns:
-      - { name: customer_id,       type: string,  required: true }
-      - { name: snapshot_date,     type: date,    required: true }
-      - { name: recency_days,      type: integer, min: 0 }
-      - { name: orders_12m,        type: integer, min: 0 }
+      - { name: customer_id,       type: string,  required: true, max_null_fraction: 0 }
+      - { name: snapshot_date,     type: date,    required: true, max_null_fraction: 0 }
+      - { name: recency_days,      type: integer, min: 0, max: 365 }
+      - { name: orders_12m,        type: integer, min: 1 }
       - { name: spend_12m_gbp,     type: float,   min: 0 }
-      - { name: distinct_products, type: integer, min: 0 }
-      - { name: country,           type: string }
-      - { name: lapsed,            type: integer, allowed: [0, 1] }
-  label: { column: lapsed }
+      - { name: distinct_products, type: integer, min: 1 }
+      - { name: country,           type: string,  max_null_fraction: 0.01 }
+      - { name: lapsed,            type: integer, allowed: [0, 1], max_null_fraction: 0 }
+  label: { column: lapsed }              # 1: no purchase in the 90 days after the cut-off
   split: { strategy: time, time_column: snapshot_date }
 
 features:
-  exclude: [customer_id]
+  exclude: [customer_id, country]        # country stays in the contract (and comes back in Chapter 10), not a feature

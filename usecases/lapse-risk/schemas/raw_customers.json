@@ -7,50 +7,35 @@
   {
     "name": "snapshot_date",
     "type": "DATE",
-    "mode": "NULLABLE"
+    "mode": "REQUIRED"
   },
   {
-    "name": "tenure_months",
+    "name": "recency_days",
     "type": "INTEGER",
     "mode": "NULLABLE"
   },
   {
-    "name": "monthly_charges",
+    "name": "orders_12m",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "spend_12m_gbp",
     "type": "FLOAT",
     "mode": "NULLABLE"
   },
   {
-    "name": "total_charges",
-    "type": "FLOAT",
-    "mode": "NULLABLE"
-  },
-  {
-    "name": "contract_length_months",
+    "name": "distinct_products",
     "type": "INTEGER",
     "mode": "NULLABLE"
   },
   {
-    "name": "num_support_tickets",
-    "type": "INTEGER",
+    "name": "country",
+    "type": "STRING",
     "mode": "NULLABLE"
   },
   {
-    "name": "num_products",
-    "type": "INTEGER",
-    "mode": "NULLABLE"
-  },
-  {
-    "name": "has_paperless_billing",
-    "type": "INTEGER",
-    "mode": "NULLABLE"
-  },
-  {
-    "name": "avg_monthly_usage_gb",
-    "type": "FLOAT",
-    "mode": "NULLABLE"
-  },
-  {
-    "name": "churned",
+    "name": "lapsed",
     "type": "INTEGER",
     "mode": "NULLABLE"
   },
