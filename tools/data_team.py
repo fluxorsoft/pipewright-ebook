@@ -3,6 +3,7 @@
     python tools/data_team.py --project <project> load
     python tools/data_team.py --project <project> sql customer_activity_backfill.sql lapse_risk_entities.sql
     python tools/data_team.py --project <project> sql customer_activity_month.sql --as-of "2011-12-01 00:00:00"
+    python tools/data_team.py --project <project> sql customer_purchases.sql --loaded-until "2011-12-10 00:00:00"
 
 Uses google-cloud-bigquery, which `pip install "pipewright-mlops[gcp]"` installs, and your gcloud credentials. The
 tables go to the dataset the SQL names (pw_retail, the retail tenant's dataset in the book's environment).
@@ -26,6 +27,7 @@ sub.add_parser("load")
 run = sub.add_parser("sql")
 run.add_argument("files", nargs="+")
 run.add_argument("--as-of", help="the @as_of parameter, a UTC timestamp")
+run.add_argument("--loaded-until", help="the @loaded_until parameter, a UTC timestamp")
 args = parser.parse_args()
 client = bigquery.Client(project=args.project, location=args.location)
 
@@ -38,10 +40,9 @@ if args.cmd == "load":
         client.load_table_from_file(f, table, job_config=config).result()
     print(f"{table}: {client.get_table(table).num_rows:,} rows")
 else:
-    params = []
-    if args.as_of:
-        as_of = datetime.fromisoformat(args.as_of).replace(tzinfo=timezone.utc)
-        params.append(bigquery.ScalarQueryParameter("as_of", "TIMESTAMP", as_of))
+    params = [bigquery.ScalarQueryParameter(name, "TIMESTAMP",
+                                            datetime.fromisoformat(value).replace(tzinfo=timezone.utc))
+              for name, value in (("as_of", args.as_of), ("loaded_until", args.loaded_until)) if value]
     for name in args.files:
         sql = (ROOT / "sql" / name).read_text(encoding="utf-8")
         job = client.query(sql, job_config=bigquery.QueryJobConfig(

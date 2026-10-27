@@ -37,3 +37,4 @@ spec:
       tables:
         lapse_risk_raw_customers: { schema: schemas/raw_customers.json, partition: { field: ingested_at, type: DAY } }
         lapse_risk_model_metrics: { schema: schemas/model_metrics.json, partition: { field: evaluated_at, type: DAY } }
+        lapse_risk_snapshots: { schema: schemas/snapshots.json, partition: { field: ingested_at, type: DAY } }
