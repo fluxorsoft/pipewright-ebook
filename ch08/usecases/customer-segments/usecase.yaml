@@ -14,7 +14,7 @@ spec:
   bqml:
     model_type: kmeans                   # data.label.task clustering
     options: { num_clusters: 4, kmeans_init_method: KMEANS++ }
-    prepare: sql/prepare.sql             # SQL over the run's rows: average order value
+    transform: sql/transform.sql         # inside the model: segments learned on a log scale
 
   model:
     name: customer-segments              # its Model Registry ID: every approved training run is a new version
