@@ -16,6 +16,7 @@ chapter changed, for example `diff -r ch04 ch05`.
 | `ch08/` | Chapter 8. Models for SQL teams | `customer-segments` (k-means) and `demand-forecast` (ARIMA_PLUS) in BigQuery ML: YAML and SQL only |
 | `ch09/` | Chapter 9. Training at scale | `train-model` sized in configuration, eight tuning trials, and the same trials on a Ray cluster per step (`training_pipeline_ray.py`) |
 | `ch10/` | Chapter 10. Evaluation gates | gates on AUC and calibration, the champion, slices and fairness by country, with the reviewed fairness decision written in `usecase.yaml` |
+| `ch11/` | Chapter 11. Features that earn their place | the candidate measurement (`tools/candidate_features.py`) and the customer's rhythm, `avg_days_between_orders`, in the feature table and the use case |
 
 Every folder is a Pipewright repository root: run `pipewright` commands from inside it.
 
