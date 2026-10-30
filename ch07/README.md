@@ -1,7 +1,7 @@
 # retailer-mlops
 
 The MLOps repository of the UK online gift retailer in *Governed MLOps on Google Cloud*, built with Pipewright
-1.1.0, as it stands at the end of **Chapter 6. Synthetic data for MLOps**. Run every command from inside this folder. The other
+1.1.0, as it stands at the end of **Chapter 7. Release like software**. Run every command from inside this folder. The other
 chapters are in the folders beside this one.
 
 ```

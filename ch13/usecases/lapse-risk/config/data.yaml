@@ -28,6 +28,7 @@ data:
     sources:
       - table: bq://pw_retail.customer_activity          # the data team's feature table, one row per month
         features: [recency_days, orders_12m, spend_12m_gbp, distinct_products, avg_days_between_orders]
+        online_view: customer_activity                    # the same features, latest values, in the online store
 
 features:
   exclude: [customer_id, country]        # country stays in the contract (and comes back in Chapter 10), not a feature

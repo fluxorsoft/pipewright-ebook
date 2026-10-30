@@ -21,6 +21,7 @@ spec:
     name: lapse-risk-classifier
     serving:                             # online, on an Agent Platform endpoint (Chapter 13)
       enabled: true
+      features: online                   # callers send a customer ID; the endpoint reads the online store
       machine: n1-standard-2
       replicas: { min: 1, max: 2 }
       canary_percent: 10                 # a new version first takes a tenth of the traffic
