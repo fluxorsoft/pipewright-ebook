@@ -14,6 +14,7 @@ chapter changed, for example `diff -r ch04 ch05`.
 | `ch06/` | Chapter 6. Synthetic data for MLOps | a synthetic copy of the training rows, gated for sharing |
 | `ch07/` | Chapter 7. Pipelines that release like software | `tests.command` with an import check (`tests/check_imports.py`), the renamed helper fixed |
 | `ch08/` | Chapter 8. Models for SQL teams | `customer-segments` (k-means) and `demand-forecast` (ARIMA_PLUS) in BigQuery ML: YAML and SQL only |
+| `ch09/` | Chapter 9. Training at scale | `train-model` sized in configuration, eight tuning trials, and the same trials on a Ray cluster per step (`training_pipeline_ray.py`) |
 
 Every folder is a Pipewright repository root: run `pipewright` commands from inside it.
 
