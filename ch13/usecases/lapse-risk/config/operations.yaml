@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../../.pipewright-schemas/usecase-part.schema.json
+# Using the model (Chapter 13): the weekly list of who to win back, written by the scoring pipeline.
+inference:
+  output_table: lapse_risk_scores        # one row per customer: return_probability, predicted_return, lapse_risk
+  decision_threshold: 0.5
+
+monitoring:
+  output_table: lapse_risk_monitoring    # what each scoring run found (Chapter 14 switches the checks on)
