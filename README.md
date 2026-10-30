@@ -12,6 +12,7 @@ chapter changed, for example `diff -r ch04 ch05`.
 | `ch04/` | Chapter 4. Features without leakage | the data team's tables and SQL (`data-team/`), features read point in time, the leakage demo |
 | `ch05/` | Chapter 5. Reproducible runs | the label from purchase events, per-run snapshots, every setting in one file (`reference/`) |
 | `ch06/` | Chapter 6. Synthetic data for MLOps | a synthetic copy of the training rows, gated for sharing |
+| `ch07/` | Chapter 7. Pipelines that release like software | `tests.command` with an import check (`tests/check_imports.py`), the renamed helper fixed |
 
 Every folder is a Pipewright repository root: run `pipewright` commands from inside it.
 
