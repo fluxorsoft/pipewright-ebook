@@ -1,0 +1,5 @@
+apiVersion: pipewright/v1
+kind: Environment
+metadata: { name: test }
+spec:
+  manifest: gs://pw-ebook-pw-artifacts/pipewright/environment.json

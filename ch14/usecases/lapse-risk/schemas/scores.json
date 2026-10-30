@@ -1,0 +1,42 @@
+[
+  {
+    "name": "customer_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "return_probability",
+    "type": "FLOAT",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "predicted_return",
+    "type": "INTEGER",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "lapse_risk",
+    "type": "FLOAT",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "model_resource_name",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "model_version_id",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "run_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "scored_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  }
+]

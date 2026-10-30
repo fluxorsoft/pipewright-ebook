@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../../../.pipewright-schemas/usecase-part.schema.json
+# Using the model (Chapter 13): the weekly list of who to win back, written by the scoring pipeline.
+inference:
+  output_table: lapse_risk_scores        # one row per customer: return_probability, predicted_return, lapse_risk
+  decision_threshold: 0.5
+
+# Watching it (Chapter 14): every scoring run compares what it scored with what the model was trained on.
+monitoring:
+  output_table: lapse_risk_monitoring    # one row per scoring run: drift, performance, whether it alerted
+  drift: { enabled: true, method: psi, threshold: 0.2 }   # each feature against its training distribution
+  prediction_drift: { enabled: true, threshold: 0.2 }     # the scores themselves against training's
+  alerts:                                # `pipewright alerts sync` turns these into email alerts
+    notify: [ml-team@example.com]        # your team's address; a distribution list works
+    events: [monitoring.alert]
+    severity: WARNING
