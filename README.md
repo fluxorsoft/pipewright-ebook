@@ -18,6 +18,7 @@ chapter changed, for example `diff -r ch04 ch05`.
 | `ch10/` | Chapter 10. Evaluation gates | gates on AUC and calibration, the champion, slices and fairness by country, with the reviewed fairness decision written in `usecase.yaml` |
 | `ch11/` | Chapter 11. Features that earn their place | the candidate measurement (`tools/candidate_features.py`) and the customer's rhythm, `avg_days_between_orders`, in the feature table and the use case |
 | `ch12/` | Chapter 12. Promotion between environments | `environments/prod.yaml` (promotion only from test) and lapse-risk's production overrides |
+| `ch13/` | Chapter 13. Serving, canaries and A/B tests | the weekly scoring pipeline and its tables, `model.serving` with a canary, online features from the feature group `customer_activity`, `tools/score_customer.py` and the platform's `online_features.tf` |
 
 Every folder is a Pipewright repository root: run `pipewright` commands from inside it.
 

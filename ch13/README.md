@@ -11,6 +11,7 @@ usecases/lapse-risk/       the lapse model: which customers will not buy again w
 usecases/customer-segments/  customer segments in BigQuery ML (Chapter 8)
 usecases/demand-forecast/    weekly demand forecast in BigQuery ML (Chapter 8)
 reference/                 lapse-risk with every setting and its default, in one file (tools/all_settings.py)
+platform/                  the online store the starter does not create yet (Chapter 13)
 ```
 
 Start from Chapter 1 to build it yourself. To use your own Google Cloud project instead of the book's, build an
