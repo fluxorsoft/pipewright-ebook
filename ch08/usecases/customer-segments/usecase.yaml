@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=../../.pipewright-schemas/usecase.schema.json
+# customer-segments: the SQL team's customer segments, trained and scored in BigQuery ML (Chapter 8). No pipeline
+# code: Pipewright provides the pipelines for a use case with a bqml section. The team writes YAML and SQL.
+apiVersion: pipewright/v1
+kind: UseCase
+metadata:
+  name: customer-segments
+  owner: sql-team
+
+spec:
+  tenant: retail
+  include: [config/*.yaml]               # config/data.yaml: the contract, the feature table, no label
+
+  bqml:
+    model_type: kmeans                   # data.label.task clustering
+    options: { num_clusters: 4, kmeans_init_method: KMEANS++ }
+    prepare: sql/prepare.sql             # SQL over the run's rows: average order value
+
+  model:
+    name: customer-segments              # its Model Registry ID: every approved training run is a new version
+
+  triggers:
+    api: true                            # `pipewright run --source-uri bq://pw-ebook.pw_retail.segment_customers`
+
+  evaluation:
+    gates:
+      - { metric: davies_bouldin_index, max: 1.5 }   # compact, well separated segments; lower is better
+
+  inference:
+    output_table: customer_segments_scores           # each customer's segment and distance to its centre
+
+  monitoring:
+    drift: { enabled: true }             # are customers moving away from what the segments were learned on?
+    output_table: customer_segments_monitoring
+
+  outputs:
+    bigquery:
+      tables:
+        customer_segments_scores:     { schema: schemas/scores.json, partition: { field: scored_at, type: DAY } }
+        customer_segments_monitoring: { schema: schemas/model_monitoring.json, partition: { field: monitored_at, type: DAY } }

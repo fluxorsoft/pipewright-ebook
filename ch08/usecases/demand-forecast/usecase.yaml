@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=../../.pipewright-schemas/usecase.schema.json
+# demand-forecast: weekly units of the retailer's ten best-selling products, forecast in BigQuery ML with ARIMA_PLUS,
+# one series per product (Chapter 8). No pipeline code: the SQL team writes YAML and SQL.
+apiVersion: pipewright/v1
+kind: UseCase
+metadata:
+  name: demand-forecast
+  owner: sql-team
+
+spec:
+  tenant: retail
+  include: [config/*.yaml]               # config/data.yaml: the series and how it is held out
+
+  bqml:
+    forecast:
+      horizon: 8                         # scoring forecasts the next eight weeks
+      id_columns: [stock_code]           # one series per product
+      confidence_level: 0.9              # the prediction interval holds 90% of future weeks
+
+  model:
+    name: demand-forecast
+    promotion: retrain                   # a forecast is retrained in each environment, never copied
+
+  triggers:
+    api: true                            # `pipewright run --source-uri bq://pw-ebook.pw_retail.weekly_product_units`
+
+  evaluation:
+    gates:
+      - { metric: mape, max: 0.5 }       # on the held-out weeks: off by at most half, on average
+
+  inference:
+    output_table: demand_forecast_scores # the next eight weeks per product, with a prediction interval
+
+  outputs:
+    bigquery:
+      tables:
+        demand_forecast_scores: { schema: schemas/scores.json, partition: { field: scored_at, type: DAY } }
