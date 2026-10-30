@@ -19,6 +19,7 @@ chapter changed, for example `diff -r ch04 ch05`.
 | `ch11/` | Chapter 11. Features that earn their place | the candidate measurement (`tools/candidate_features.py`) and the customer's rhythm, `avg_days_between_orders`, in the feature table and the use case |
 | `ch12/` | Chapter 12. Promotion between environments | `environments/prod.yaml` (promotion only from test) and lapse-risk's production overrides |
 | `ch13/` | Chapter 13. Serving, canaries and A/B tests | the weekly scoring pipeline and its tables, `model.serving` with a canary, online features from the feature group `customer_activity`, `tools/score_customer.py` and the platform's `online_features.tf` |
+| `ch14/` | Chapter 14. Monitoring drift and performance | drift, prediction drift and email alerts on, the monthly backtest views, entity cut-offs from December 2010, `scored_for` on every score and `sql/performance.sql`; serving back to request mode |
 
 Every folder is a Pipewright repository root: run `pipewright` commands from inside it.
 
