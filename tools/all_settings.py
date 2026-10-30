@@ -23,6 +23,7 @@ ORDER = ["tenant", "pipelines", "components", "framework", "triggers", "paramete
          "retraining", "data_protection", "outputs", "model", "approvals", "labels"]
 NAMED = {"parameters", "steps", "hyperparameters", "search_space", "tables"}   # their keys are names, not settings
 DERIVED = {"outputs.bigquery.tables.<name>.columns", "outputs.bigquery.dataset"}  # resolve reports, nobody sets
+WIDTH = 78                                                    # the widest line that prints on a page
 NOT_LISTED = {"resources", "pipeline", "resources_per_step", "features_store"}   # the platform's, older names, reserved
 
 
@@ -100,10 +101,23 @@ def emit(node, path, own, overridden, known, out, indent, shown):
             emit(value, p, own, overridden, known, out, indent + 1, shown)
         elif isinstance(value, list) and value and any(isinstance(x, dict) for x in value):
             out.append(f"{pad}{key}:{mark}")
-            out.extend(f"{pad}  - {scalar(item)}" for item in value)
+            for item in value:
+                line = f"{pad}  - {scalar(item)}"
+                if len(line) <= WIDTH or not isinstance(item, dict):
+                    out.append(line)
+                else:                              # too wide for a page: one key per line
+                    for i, (k, v) in enumerate(item.items()):
+                        out.append(f"{pad}  {'- ' if i == 0 else '  '}{k}: {scalar(v)}")
             shown.update(f"{g}.{k}" for item in value if isinstance(item, dict) for k in item)
         else:
-            out.append(f"{pad}{key}: {scalar(value)}{mark}")
+            line = f"{pad}{key}: {scalar(value)}"
+            if len(line + mark) <= WIDTH:
+                out.append(line + mark)
+            elif isinstance(value, list):          # too wide for a page: one item per line
+                out.append(f"{pad}{key}:{mark}")
+                out.extend(f"{pad}  - {scalar(item)}" for item in value)
+            else:                                  # the mark on its own line above
+                out += [f"{pad}#{mark.lstrip().lstrip('#')}", line]
 
 
 parser = argparse.ArgumentParser()
@@ -117,11 +131,12 @@ resolved = next(d for d in yaml.safe_load_all(text) if d)
 (own, overridden), known = team_config(args.usecase, args.env), documented()
 spec = {k: resolved[k] for k in ORDER if k in resolved}
 
-out = [f"# Every setting of {args.usecase}, as `pipewright resolve --env {args.env}` runs it (Pipewright 1.1.0).",
-       "# Unmarked: the team's own value, as written. `# default`: what Pipewright fills in when the key is left out.",
+out = [f"# Every setting of {args.usecase}, as `pipewright resolve --env {args.env}` runs it.",
+       "# No mark: the team's own value, as written.",
+       "# `# default`: what Pipewright uses when the key is left out.",
        f"# `# environments/{args.env}.yaml`: set for this environment only.",
-       "# The platform's values (runner, dataset, landing prefix) come from the environment manifest, not from here.",
-       "# Written by tools/all_settings.py. `pipewright explain <key>` explains any key.",
+       "# The platform's values (runner, dataset, landing prefix) are in the manifest.",
+       "# Written by tools/all_settings.py. `pipewright explain <key>` explains a key.",
        "apiVersion: pipewright/v1", "kind: UseCase", "metadata:",
        f"  name: {resolved['usecase']}", f"  owner: {resolved['owner']}", "spec:"]
 shown: set[str] = set()
@@ -130,10 +145,12 @@ emit(spec, [], own, overridden, known, out, 1, shown)
 # The settings this use case does not use at all, each with what it is for: the rest of the range.
 unused = sorted(k for k in known if k not in shown and k.split(".")[0] not in NOT_LISTED)
 tops = [k for k in unused if not any(k.startswith(u + ".") for u in unused if u != k)]
-out += ["", "# Also available, not used by this use case (`pipewright explain <key>` for each):"]
+out += ["", "# Also available, not used by this use case (see `pipewright explain`):"]
 for k in tops:
     n = sum(1 for u in unused if u.startswith(k + "."))
-    what = known[k] if len(known[k]) <= 80 else known[k][:80].rsplit(" ", 1)[0] + " ..."
     count = f" ({n} key{'s' if n > 1 else ''})" if n else ""
-    out.append(f"#   {k}{count}: {what}")
+    head = f"#   {k}{count}: "
+    room = max(WIDTH - len(head), 24)                 # one line each, readable in print
+    what = known[k] if len(known[k]) <= room else known[k][:room - 4].rsplit(" ", 1)[0] + " ..."
+    out.append(head + what)
 sys.stdout.write("\n".join(out) + "\n")
