@@ -1,0 +1,2132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pipewright use case: per-environment overrides",
+  "description": "Keys that may vary per environment. Everything else is fixed so promotion compares like with like.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "parameters": {
+      "$ref": "#/$defs/parameters",
+      "description": "Values passed to every pipeline that declares a parameter of the same name. ${...} references to resources, model and manifest names are filled in."
+    },
+    "resources_per_step": {
+      "$ref": "#/$defs/steps",
+      "description": "The older name of `steps`, merged with it. Prefer `steps`."
+    },
+    "steps": {
+      "$ref": "#/$defs/steps",
+      "description": "Compute and behaviour per pipeline step, applied to the compiled pipeline; no pipeline code change needed."
+    },
+    "triggers": {
+      "$ref": "#/$defs/triggers",
+      "description": "What starts a run, and which pipeline it starts."
+    },
+    "training": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hyperparameters": {
+          "$ref": "#/$defs/hyperparameters",
+          "description": "Values the training step reads, by name (for example epochs, learning_rate)."
+        },
+        "tuning": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether training tunes before the final fit."
+            },
+            "max_trials": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "description": "The most trials in one run."
+            },
+            "parallel_trials": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "description": "How many trials run at the same time."
+            }
+          },
+          "description": "Hyperparameter tuning, which runs several trials and keeps the best."
+        }
+      },
+      "description": "Hyperparameters, the experiment and tuning."
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "serving": {
+          "$ref": "#/$defs/serving",
+          "description": "Online serving on an endpoint, deployed with `pipewright deploy-model`."
+        }
+      },
+      "description": "The model in the Model Registry and how it is served."
+    },
+    "approvals": {
+      "$ref": "#/$defs/approvals",
+      "description": "Which changes need a person."
+    },
+    "synthetic": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Synthetic data generation. Off unless enabled; with it off nothing is compiled, built or released for it.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Switches synthetic data on for this use case. May differ per environment (for example on in production-grade environments only)."
+        },
+        "rows": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "How many rows to generate. Default: as many as the source has. May differ per environment."
+        },
+        "engine": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_training_minutes": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "The training time limit per candidate. May differ per environment."
+            }
+          },
+          "description": "The engine and its settings. Every candidate starts from these."
+        }
+      }
+    },
+    "retraining": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "The older switch. true means mode propose, false means off."
+        },
+        "mode": {
+          "enum": [
+            "off",
+            "propose",
+            "candidate",
+            false
+          ],
+          "description": "off (alerts only), propose (a case opens and a person decides) or candidate (trains a candidate that is never promoted). Write \"off\" in quotes, since YAML reads a bare off as false (which also means off)."
+        },
+        "loop": {
+          "$ref": "#/$defs/retraining/properties/loop",
+          "description": "The closed retrain loop: production never trains. An approved case here is trained in the environment this one's releases come from (environments/<env>.yaml promotion.from), on this environment's data through a read-only grant, compared with the model this environment serves, validated by a scoring run there, then promoted, approved and verified here. `pipewright loop` drives it."
+        },
+        "decisions": {
+          "$ref": "#/$defs/retraining/properties/decisions",
+          "description": "How people hear about a retrain case and how long they have to decide."
+        },
+        "approvals": {
+          "$ref": "#/$defs/retraining/properties/approvals",
+          "description": "Who must agree before a retrain runs."
+        },
+        "snooze": {
+          "$ref": "#/$defs/retraining/properties/snooze",
+          "description": "Putting off a decision."
+        }
+      },
+      "description": "What drift or a performance drop leads to, and who decides on a retrain."
+    },
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "alerts": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Email for Pipewright events, set up by `pipewright alerts sync`.",
+          "properties": {
+            "notify": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+              },
+              "description": "Email addresses, distribution lists included."
+            },
+            "events": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "enum": [
+                  "monitoring.alert",
+                  "retrain.requested",
+                  "training.rejected",
+                  "training.evaluated",
+                  "model.registered"
+                ]
+              },
+              "description": "The events that send an email."
+            },
+            "severity": {
+              "enum": [
+                "CRITICAL",
+                "ERROR",
+                "WARNING"
+              ],
+              "description": "The severity of the alert policies."
+            }
+          }
+        }
+      },
+      "description": "Checks run on each inference, for drift, prediction drift and performance against observed outcomes."
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bigquery": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "retention_days": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Days before partitions are deleted."
+            }
+          },
+          "description": "BigQuery tables the use case owns, created and evolved by `pipewright tables sync` (additive changes only)."
+        }
+      },
+      "description": "Where the use case's tables are written."
+    }
+  },
+  "$defs": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,30}$"
+    },
+    "principal": {
+      "type": "string",
+      "pattern": "^(group|user|serviceAccount):.+$"
+    },
+    "approval_mode": {
+      "enum": [
+        "manual",
+        "auto"
+      ]
+    },
+    "pipeline_name": {
+      "enum": [
+        "training",
+        "inference",
+        "synthetic"
+      ],
+      "description": "synthetic: the pipeline Pipewright provides when synthetic.enabled"
+    },
+    "pipeline_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "function"
+      ],
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "\\.py$",
+          "description": "The Python file, relative to the use case folder, that defines the inference pipeline."
+        },
+        "function": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "The name of the inference pipeline function in that file."
+        }
+      }
+    },
+    "parameters": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ],
+        "description": "A pipeline parameter value."
+      }
+    },
+    "triggers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "landing": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "A run when a file lands under the use case's landing prefix. null turns it off, for example in one environment.",
+          "additionalProperties": false,
+          "required": [
+            "suffixes"
+          ],
+          "properties": {
+            "suffixes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^\\.[A-Za-z0-9.]+$"
+              },
+              "description": "File name endings that start a run when a file lands under the use case's landing prefix, for example [.csv]."
+            },
+            "pipeline": {
+              "$ref": "#/$defs/pipeline_name",
+              "description": "The pipeline a landed file starts."
+            }
+          }
+        },
+        "schedules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "cron",
+              "timezone"
+            ],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/name",
+                "description": "The schedule's name, unique in the use case."
+              },
+              "cron": {
+                "type": "string",
+                "minLength": 1,
+                "description": "When it runs, in cron syntax, for example \"0 6 * * *\" (06:00 every day)."
+              },
+              "timezone": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The time zone the cron expression is read in, for example Europe/London."
+              },
+              "source_uri": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The gs:// data the scheduled run reads. ${buckets.landing} and other manifest names may be used."
+              },
+              "pipeline": {
+                "$ref": "#/$defs/pipeline_name",
+                "description": "The pipeline the schedule starts."
+              }
+            }
+          },
+          "description": "Runs on a schedule (Cloud Scheduler jobs, created by `pipewright schedules sync`)."
+        },
+        "api": {
+          "type": "boolean",
+          "description": "Whether the launcher's POST /run may start this use case's pipelines (for scoring on demand and retrains)."
+        }
+      }
+    },
+    "steps": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cpu": {
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "CPUs for the step, for example 4 or \"500m\"."
+          },
+          "memory": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?[MG]$",
+            "description": "Memory for the step, for example 8G."
+          },
+          "gpu": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "count"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The accelerator type, for example NVIDIA_TESLA_T4."
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "How many accelerators."
+              }
+            },
+            "description": "An accelerator for the step."
+          },
+          "retries": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10,
+            "description": "How many times a failed step is retried."
+          },
+          "cache": {
+            "type": "boolean",
+            "description": "Whether the step may reuse a cached result from an identical earlier run."
+          },
+          "ray": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "head_machine": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The head node's machine type, with at least 16 vCPUs and more than 18 GB (for example n1-standard-16). Left out, the first allowed machine type that is big enough."
+              },
+              "worker_machine": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The worker nodes' machine type. Left out, the same as the head."
+              },
+              "workers": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "How many worker nodes, besides the head; 0 runs everything on the head. At most the platform's max_workers."
+              },
+              "accelerator": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "count"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The accelerator type, for example NVIDIA_TESLA_T4."
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "How many accelerators per node."
+                  }
+                },
+                "description": "An accelerator on each worker (on the head when there are no workers), if the platform allows one."
+              },
+              "max_minutes": {
+                "type": "integer",
+                "minimum": 5,
+                "description": "The longest the cluster may live; after that, plus a grace period, the launcher removes it. At most the platform's limit."
+              }
+            },
+            "description": "A Ray on Agent Platform cluster for this step, for this run only. The launcher creates it, sized within the platform's limits, and deletes it when the step ends. The step itself takes no cpu, memory or gpu."
+          }
+        },
+        "description": "A step, by its component name with dashes (train-model for train_model)."
+      }
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The column name."
+        },
+        "type": {
+          "enum": [
+            "string",
+            "integer",
+            "float",
+            "boolean",
+            "date",
+            "timestamp"
+          ],
+          "description": "The column's type."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the column must be present."
+        },
+        "min": {
+          "type": "number",
+          "description": "The smallest allowed value."
+        },
+        "max": {
+          "type": "number",
+          "description": "The largest allowed value."
+        },
+        "allowed": {
+          "type": "array",
+          "description": "The only values allowed."
+        },
+        "max_null_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "The largest share of empty values allowed in this column, 0 to 1."
+        }
+      }
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/column"
+              },
+              "description": "The expected columns. `pipewright new-usecase --from-bq` drafts them from a BigQuery table."
+            },
+            "min_rows": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The fewest rows a run accepts."
+            },
+            "max_null_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "The largest share of empty values allowed in any column, 0 to 1."
+            },
+            "unique": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Columns whose values must not repeat, such as an ID."
+            },
+            "allow_extra_columns": {
+              "type": "boolean",
+              "description": "Whether columns not in the contract are allowed. When false, they stop the run."
+            }
+          },
+          "description": "What the input data must look like. A run whose data breaks the contract stops before training."
+        },
+        "label": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "description": "The label column's name."
+            },
+            "values": {
+              "type": "array",
+              "description": "The label's possible values, for example [0, 1]."
+            },
+            "positive": {
+              "description": "The value that counts as positive for metrics such as precision and recall."
+            },
+            "task": {
+              "enum": [
+                "binary",
+                "multiclass",
+                "regression",
+                "clustering",
+                "decomposition",
+                "forecast"
+              ],
+              "description": "What the model predicts: binary (the default), multiclass or regression; with BigQuery ML also clustering (kmeans), decomposition (pca) and forecast (arima_plus or AI.FORECAST), Pipewright 1.1. It sets which metrics evaluation, gates, the champion comparison and monitoring accept, and their defaults: auc for binary, f1_macro for multiclass, rmse for regression (lower is better), davies_bouldin_index for clustering, total_explained_variance_ratio for decomposition, mae for forecast. Regression splits random unless data.split.strategy says otherwise."
+            }
+          },
+          "description": "The column the model learns to predict."
+        },
+        "split": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "strategy": {
+              "enum": [
+                "random",
+                "stratified",
+                "time"
+              ],
+              "description": "random, stratified (keeps the label's proportions) or time (the newest rows are the test set)."
+            },
+            "time_column": {
+              "type": "string",
+              "description": "The column that orders rows in time; needed with strategy time."
+            },
+            "test_fraction": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 1,
+              "description": "The share of rows held back for testing."
+            },
+            "validation_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "exclusiveMaximum": 1,
+              "description": "The share of rows held back for validation during training."
+            },
+            "seed": {
+              "type": "integer",
+              "description": "The random seed, so a split can be repeated."
+            }
+          },
+          "description": "How data is divided into training, validation and test sets."
+        },
+        "snapshot_table": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The table, in outputs.bigquery.tables, where the ingest step keeps a copy of exactly what each run read, tagged with run_id (its schema needs run_id, source_uri and ingested_at). `pipewright run --replay <run_id>` reads those rows again, so a rerun of the same release trains on the same data."
+        },
+        "label_source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "table",
+            "time_column",
+            "window_days"
+          ],
+          "properties": {
+            "table": {
+              "type": "string",
+              "pattern": "^bq://",
+              "description": "The label events: bq://project.dataset.table, with the key columns and a time column. The runner needs read access."
+            },
+            "key": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              },
+              "description": "The columns that match an event to a row, named the same in both tables. Default data.features_from.entity.columns."
+            },
+            "time_column": {
+              "type": "string",
+              "description": "When each event happened, a date or timestamp column of the label table."
+            },
+            "window_days": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "How many days after a row's cut-off an event still counts, for example 20 for a purchase within 20 days of sign-up."
+            },
+            "cutoff_column": {
+              "type": "string",
+              "description": "The row's cut-off in the run's source, a date or timestamp column. Default data.features_from.entity.time_column, else data.split.time_column."
+            }
+          },
+          "description": "Take the label from a table of events instead of the run's source: a row is 1 when an event for its key falls within window_days after its cut-off, otherwise 0. Rows whose window has not closed by the newest event are dropped, 1s and 0s alike. Applied by training's ingest step (read_source with labels=True)."
+        },
+        "features_from": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entity",
+            "sources"
+          ],
+          "properties": {
+            "entity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "columns",
+                "time_column"
+              ],
+              "properties": {
+                "columns": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The columns that identify an entity, such as customer_id."
+                },
+                "time_column": {
+                  "type": "string",
+                  "description": "The cut-off time of each row: features dated after it are not used. For scoring, set it to the scoring date. A table without this column is cut off at the query time (mark the column required: false in the contract)."
+                }
+              },
+              "description": "The entity table's key and cut-off columns."
+            },
+            "sources": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "features"
+                ],
+                "properties": {
+                  "table": {
+                    "type": "string",
+                    "pattern": "^bq://",
+                    "description": "A BigQuery feature table or view: bq://project.dataset.table. It has the entity columns, a timestamp column and one column per feature. The runner needs read access."
+                  },
+                  "feature_group": {
+                    "type": "string",
+                    "description": "A feature group registered in the Agent Platform Feature Store, instead of a table. Read from the Feature Registry at each run: its table, entity and time columns, and each feature's column. features then names registered features."
+                  },
+                  "project": {
+                    "type": "string",
+                    "description": "The project the feature group is registered in. Default the environment's project."
+                  },
+                  "region": {
+                    "type": "string",
+                    "description": "The region the feature group is registered in. Default the environment's region."
+                  },
+                  "entity_columns": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The table's entity columns, in the order of entity.columns, when their names differ. Default the same names."
+                  },
+                  "time_column": {
+                    "type": "string",
+                    "description": "The table's column saying when each value became true. Default feature_timestamp."
+                  },
+                  "features": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The feature columns to take from this table. Each must be in the data contract."
+                  },
+                  "prefix": {
+                    "type": "string",
+                    "description": "Added to this table's feature names, when two tables have a feature of the same name."
+                  },
+                  "online_view": {
+                    "type": "string",
+                    "pattern": "^[a-z_][a-z0-9_]{0,59}$",
+                    "description": "The feature view in the tenant's online store that serves this source's features (model.serving.features online). Default: the feature group's name."
+                  }
+                }
+              },
+              "description": "The feature tables to read, owned by whoever produces the features."
+            }
+          },
+          "description": "Read features from feature tables instead of taking every column from the run's source. The source becomes the entity table: the entity IDs, a cut-off time per row and the label. Each row gets the latest feature values at or before its cut-off, so nothing from after it reaches training."
+        }
+      }
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Only these columns are features. Left out, every column except the label and those excluded."
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Columns never used as features, such as IDs and dates."
+        }
+      }
+    },
+    "hyperparameters": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": [
+          "number",
+          "string",
+          "boolean"
+        ],
+        "description": "A hyperparameter value."
+      }
+    },
+    "training": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hyperparameters": {
+          "$ref": "#/$defs/hyperparameters",
+          "description": "Values the training step reads, by name (for example epochs, learning_rate)."
+        },
+        "seed": {
+          "type": "integer",
+          "description": "The random seed for training, so a run can be repeated."
+        },
+        "experiment": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,127}$",
+              "description": "The experiment's name. Left out, one is named after the use case."
+            }
+          },
+          "description": "The Agent Platform experiment runs are recorded in."
+        },
+        "tuning": {
+          "$ref": "#/$defs/tuning",
+          "description": "Hyperparameter tuning, which runs several trials and keeps the best."
+        }
+      }
+    },
+    "tuning": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether training tunes before the final fit."
+        },
+        "metric": {
+          "type": "string",
+          "description": "The metric trials are compared on. Left out, evaluation.primary_metric."
+        },
+        "goal": {
+          "enum": [
+            "maximize",
+            "minimize"
+          ],
+          "description": "Whether a larger (maximize) or smaller (minimize) metric is better."
+        },
+        "max_trials": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "description": "The most trials in one run."
+        },
+        "parallel_trials": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "How many trials run at the same time."
+        },
+        "search_space": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "enum": [
+                  "double",
+                  "integer",
+                  "discrete",
+                  "categorical"
+                ],
+                "description": "double and integer take min and max; discrete and categorical take values."
+              },
+              "min": {
+                "type": "number",
+                "description": "The smallest value tried."
+              },
+              "max": {
+                "type": "number",
+                "description": "The largest value tried."
+              },
+              "values": {
+                "type": "array",
+                "minItems": 1,
+                "description": "The values tried."
+              },
+              "scale": {
+                "enum": [
+                  "linear",
+                  "log"
+                ],
+                "description": "linear, or log for ranges over orders of magnitude such as learning rates."
+              }
+            },
+            "description": "One hyperparameter's range."
+          },
+          "description": "The hyperparameters to try, by name, and their ranges."
+        }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric"
+      ],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "description": "The metric the gate checks."
+        },
+        "min": {
+          "type": "number",
+          "description": "The lowest value allowed."
+        },
+        "max": {
+          "type": "number",
+          "description": "The highest value allowed."
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primary_metric": {
+          "type": "string",
+          "description": "The metric that matters most; used by tuning and the champion comparison when they name none."
+        },
+        "decision_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "The score above which a prediction counts as positive, for the metrics that need one."
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The metrics computed on the test set."
+        },
+        "gates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gate"
+          },
+          "description": "Minimums and maximums a model must meet. A model that fails one is not registered as a candidate."
+        },
+        "champion": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether a new model must beat the champion."
+            },
+            "metric": {
+              "type": "string",
+              "description": "The metric compared. Left out, evaluation.primary_metric."
+            },
+            "min_improvement": {
+              "type": "number",
+              "description": "How much better the new model must be."
+            }
+          },
+          "description": "Comparison with the current champion on the same test data."
+        },
+        "slices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Columns whose values form slices (groups) the model is also measured on."
+        },
+        "slice_gates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "metric",
+              "max_gap"
+            ],
+            "properties": {
+              "metric": {
+                "type": "string",
+                "description": "The metric compared per slice."
+              },
+              "max_gap": {
+                "type": "number",
+                "minimum": 0,
+                "description": "The largest amount a slice may be worse than overall."
+              },
+              "min_rows": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Slices with fewer test rows are not checked."
+              }
+            }
+          },
+          "description": "The largest gap allowed between a slice and the overall result."
+        },
+        "fairness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "attributes"
+          ],
+          "description": "Bias measures per attribute on the test set (binary classification, Pipewright 1.1): the largest gap between the attribute's groups. Recorded in the evaluation record and the model card; gates refuse a model above a maximum.",
+          "properties": {
+            "attributes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              },
+              "description": "Columns of the data contract to measure by, for example gender or age_band. They need not be features and may be personal data: they are measured, never trained on."
+            },
+            "metrics": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "demographic_parity_difference",
+                  "equal_opportunity_difference",
+                  "equalized_odds_difference"
+                ]
+              },
+              "description": "demographic_parity_difference (selection rates), equal_opportunity_difference (true positive rates), equalized_odds_difference (the larger of the true and false positive rate gaps). Default: all three."
+            },
+            "gates": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "metric",
+                  "max"
+                ],
+                "properties": {
+                  "metric": {
+                    "enum": [
+                      "demographic_parity_difference",
+                      "equal_opportunity_difference",
+                      "equalized_odds_difference"
+                    ],
+                    "description": "The fairness measure this gate limits."
+                  },
+                  "max": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "The largest gap allowed between the attribute's groups, from 0 to 1."
+                  }
+                }
+              },
+              "description": "A maximum per measure, for example {metric: demographic_parity_difference, max: 0.1}. Pipewright rechecks them before a version becomes the default."
+            },
+            "min_rows": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Groups with fewer test rows are listed but not measured (default 30), so a tiny group cannot decide a gate."
+            }
+          }
+        }
+      }
+    },
+    "synthetic_engine": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "mostlyai",
+            "sdv"
+          ],
+          "description": "As synthetic.engine.type, for this candidate."
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "As synthetic.engine.model, for this candidate."
+        },
+        "max_training_minutes": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "As synthetic.engine.max_training_minutes, for this candidate."
+        },
+        "differential_privacy": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "epsilon"
+          ],
+          "properties": {
+            "epsilon": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "The privacy budget for this candidate."
+            }
+          },
+          "description": "As synthetic.engine.differential_privacy, for this candidate."
+        },
+        "sampling_temperature": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 2,
+          "description": "As synthetic.engine.sampling_temperature, for this candidate."
+        },
+        "rare_categories": {
+          "enum": [
+            "constant",
+            "sample"
+          ],
+          "description": "As synthetic.engine.rare_categories, for this candidate."
+        },
+        "epochs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "As synthetic.engine.epochs, for this candidate."
+        }
+      }
+    },
+    "synthetic_min_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min"
+      ],
+      "properties": {
+        "min": {
+          "type": "number",
+          "description": "Defaults: 0.9 (test-data), 1.0 (sharing)."
+        }
+      }
+    },
+    "synthetic_max_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max"
+      ],
+      "properties": {
+        "max": {
+          "type": "number",
+          "description": "Defaults: 0.50 (test-data), 0.25 (sharing)."
+        }
+      }
+    },
+    "bqml": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "BigQuery ML as the training engine: Pipewright provides the training and scoring pipelines (model_type, or import)",
+      "properties": {
+        "model_type": {
+          "enum": [
+            "logistic_reg",
+            "boosted_tree_classifier",
+            "random_forest_classifier",
+            "linear_reg",
+            "boosted_tree_regressor",
+            "random_forest_regressor",
+            "kmeans",
+            "pca",
+            "arima_plus"
+          ],
+          "description": "The BigQuery ML model type, matching data.label.task: logistic_reg, boosted_tree_classifier or random_forest_classifier for binary and multiclass; linear_reg, boosted_tree_regressor or random_forest_regressor for regression; kmeans for clustering, pca for decomposition and arima_plus for forecast (Pipewright 1.1)."
+        },
+        "forecast": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "horizon"
+          ],
+          "description": "A forecast (data.label.task forecast, Pipewright 1.1): the series is data.label.column over data.split.time_column, one series per id_columns value. Training holds out the latest period (data.split.test_fraction of the time range), forecasts it and measures the forecast against what happened (mae, rmse, mape); scoring writes the next horizon points to inference.output_table (forecast_timestamp, forecast_value, the interval and the ID columns).",
+          "properties": {
+            "engine": {
+              "enum": [
+                "arima_plus",
+                "ai_forecast"
+              ],
+              "description": "arima_plus (the default: CREATE MODEL ARIMA_PLUS, registered like any BigQuery ML model) or ai_forecast (AI.FORECAST with Google's TimesFM model: no model is trained, the version holds the settings it was measured with). ai_forecast sends the series to a Google foundation model, an exception to C-08 the platform allows with policies.bqml.ai_forecast."
+            },
+            "horizon": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "description": "How many time points scoring forecasts, per series (at most 10000)."
+            },
+            "id_columns": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "description": "The columns that tell series apart (for example a store), from data.contract.columns. Left out, the rows are one series."
+            },
+            "confidence_level": {
+              "type": "number",
+              "minimum": 0,
+              "exclusiveMaximum": 1,
+              "description": "The share of future values the prediction interval should hold. Default 0.95."
+            },
+            "model": {
+              "enum": [
+                "TimesFM 2.5"
+              ],
+              "description": "ai_forecast only: the TimesFM model. TimesFM 2.5 (generally available)."
+            },
+            "context_window": {
+              "enum": [
+                64,
+                128,
+                256,
+                512,
+                1024,
+                2048,
+                4096,
+                8192,
+                15360
+              ],
+              "description": "ai_forecast only: how many of the latest points the model reads. Left out, the smallest window that covers the history."
+            }
+          }
+        },
+        "import": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "format",
+            "path",
+            "outputs"
+          ],
+          "description": "A model trained elsewhere (TensorFlow SavedModel or ONNX), imported into BigQuery ML instead of trained there, then evaluated on the run's test rows, gated and registered like a trained one (Pipewright 1.1). Instead of bqml.model_type; no options, transform or explain.",
+          "properties": {
+            "format": {
+              "enum": [
+                "tensorflow",
+                "onnx"
+              ],
+              "description": "tensorflow or onnx (XGBoost imports need input and output schemas: not supported yet)."
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^gs://.+/\\*$",
+              "description": "gs://.../* : the model's files, readable by the tenant's runner. Their checksums are recorded with the run."
+            },
+            "outputs": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "score": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                  "description": "The output column with the positive class probability (binary classification)."
+                },
+                "score_index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "When the score column is an array of class probabilities: the positive class's position in it (from 0)."
+                },
+                "label": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                  "description": "The output column with the predicted class (multi-class; optional for binary)."
+                },
+                "prediction": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                  "description": "The output column with the prediction (regression)."
+                }
+              },
+              "description": "Which output column of the model holds what: score (the positive class probability, binary), label (the predicted class, multi-class) or prediction (regression)."
+            }
+          }
+        },
+        "options": {
+          "type": "object",
+          "description": "CREATE MODEL options, for example {max_iterations: 50, l2_reg: 0.1}. Pipewright sets the label, the split, the key, the registry and explanations itself, so those options are refused."
+        },
+        "transform": {
+          "type": "string",
+          "pattern": "\\.sql$",
+          "description": "A .sql file with the expressions of a TRANSFORM clause (without TRANSFORM ( ... )), for preparation the model needs when it is served: BigQuery ML applies it in ML.PREDICT and at a Model Registry endpoint. Pinned by the release."
+        },
+        "prepare": {
+          "type": "string",
+          "pattern": "\\.sql$",
+          "description": "A .sql file with a SELECT over {rows} (the run's rows): preparation in SQL, pinned by the release. Its output is written into the run's rows before training; scoring runs the same file. An endpoint runs no SQL, so preparation needed online belongs in bqml.transform."
+        },
+        "explain": {
+          "type": "boolean",
+          "description": "Compute global explanations when the model is created (ML.GLOBAL_EXPLAIN). Left out, explainability.enabled."
+        },
+        "max_bytes_billed": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The most bytes one BigQuery ML job of this use case may bill. Left out, the platform's policies.bqml.max_bytes_billed, else 100 GiB. Tree models bill far more bytes than linear ones."
+        }
+      }
+    },
+    "synthetic": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "synthetic data generation (off unless enabled): an engine learns from real data inside the environment, or rules generate rows from the data contract alone",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Switches synthetic data on for this use case. May differ per environment (for example on in production-grade environments only)."
+        },
+        "purpose": {
+          "enum": [
+            "test-data",
+            "sharing"
+          ],
+          "description": "Sets the default gates. test-data stays in the organisation; sharing leaves it and has stricter privacy gates."
+        },
+        "tier": {
+          "enum": [
+            "learned",
+            "contract"
+          ],
+          "description": "learned (an engine learns from real data inside this environment, in the synthetic pipeline) or contract (rows from the data contract and rules alone, no real data, from `pipewright synthetic generate`)."
+        },
+        "source_uri": {
+          "type": "string",
+          "description": "The data the engine learns from, bq:// or gs://, read point in time like training (with data.features_from, the entity table)."
+        },
+        "output_table": {
+          "type": "string",
+          "description": "The table in outputs.bigquery.tables that receives the synthetic rows. Its schema holds the contract's columns and a run_id column."
+        },
+        "rows": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "How many rows to generate. Default: as many as the source has. May differ per environment."
+        },
+        "holdout_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 0.5,
+          "description": "Real rows kept back from the engine, to test utility and privacy against."
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Seed for the holdout split and the rules. Default: training.seed."
+        },
+        "engine": {
+          "$ref": "#/$defs/synthetic_engine",
+          "unevaluatedProperties": false,
+          "description": "The engine and its settings. Every candidate starts from these."
+        },
+        "candidates": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/synthetic_engine",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,30}$"
+              }
+            },
+            "unevaluatedProperties": false
+          },
+          "description": "Variants of the engine tried side by side, each with a name; the best one that passes every gate is kept. Default for mostlyai: the engine as given and the same at sampling temperature 1.3."
+        },
+        "columns": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "rule"
+            ],
+            "properties": {
+              "rule": {
+                "enum": [
+                  "key",
+                  "fake",
+                  "constant",
+                  "drop",
+                  "time",
+                  "values",
+                  "range"
+                ],
+                "description": "key (new unique keys), fake (made-up personal data), constant, drop (null), time (dates on a grid), values (a categorical with chosen frequencies) or range (uniform between min and max)."
+              },
+              "prefix": {
+                "type": "string",
+                "description": "rule key: the text before the number (default SYN-)."
+              },
+              "provider": {
+                "enum": [
+                  "email",
+                  "name",
+                  "phone",
+                  "uuid",
+                  "text"
+                ],
+                "description": "rule fake: email, name, phone, uuid or text. Emails use example.com and phone numbers the reserved drama range."
+              },
+              "value": {
+                "description": "rule constant: the value."
+              },
+              "from": {
+                "type": "string",
+                "description": "rule time: the first date (YYYY-MM-DD)."
+              },
+              "to": {
+                "type": "string",
+                "description": "rule time: the last date (YYYY-MM-DD)."
+              },
+              "step": {
+                "enum": [
+                  "day",
+                  "month_end"
+                ],
+                "description": "rule time: day (any day) or month_end (the last day of each month)."
+              },
+              "values": {
+                "type": "array",
+                "minItems": 1,
+                "description": "rule values: the values to choose from."
+              },
+              "weights": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "description": "rule values: how often each value appears, one number per value."
+              },
+              "min": {
+                "type": "number",
+                "description": "rule range: the lowest value."
+              },
+              "max": {
+                "type": "number",
+                "description": "rule range: the highest value."
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Columns decided by rules instead of learned: keys, personal data, time grids. Personal-data columns without a rule become new keys (if unique) or nulls; they are never learned."
+        },
+        "sensitive_columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Columns an inference attack tries to recover, besides the label (for example a health condition)."
+        },
+        "gates": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fidelity": {
+              "$ref": "#/$defs/synthetic_min_gate",
+              "description": "How closely the synthetic data matches the real data's distributions (SDMetrics quality score, 0 to 1)."
+            },
+            "tstr_drop": {
+              "$ref": "#/$defs/synthetic_max_gate",
+              "description": "How much worse a model trained on synthetic data scores on real data (AUC) than one trained on real data."
+            },
+            "exact_copies": {
+              "$ref": "#/$defs/synthetic_max_gate",
+              "description": "The share of synthetic rows identical to a training row."
+            },
+            "dcr_ratio": {
+              "$ref": "#/$defs/synthetic_min_gate",
+              "description": "How far synthetic rows are from the training rows compared with unseen real rows (median distance to the closest record). Below 1 is a sign of copying."
+            },
+            "closer_than_p5": {
+              "$ref": "#/$defs/synthetic_max_gate",
+              "description": "The share of synthetic rows closer to a training row than 95% of unseen real rows are. Independent data gives about 5%."
+            },
+            "singling_out": {
+              "$ref": "#/$defs/synthetic_max_gate",
+              "description": "The risk that an attacker can single out one real person (Anonymeter, upper confidence bound)."
+            },
+            "linkability": {
+              "$ref": "#/$defs/synthetic_max_gate",
+              "description": "The risk that an attacker can link records of one real person (Anonymeter, upper confidence bound)."
+            },
+            "inference": {
+              "$ref": "#/$defs/synthetic_max_gate",
+              "description": "The risk that an attacker can infer the label or a sensitive column of a real person (Anonymeter, upper confidence bound, the worst column)."
+            }
+          },
+          "description": "Overrides of the purpose's gates. Pipewright recomputes every gate before publishing; privacy gates may only be made stricter."
+        },
+        "evaluation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "attacks": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 5000,
+              "description": "Anonymeter attacks per risk (default 1000). Fewer give confidence bounds too wide to gate on."
+            }
+          },
+          "description": "How candidates are scored."
+        },
+        "requirements": {
+          "type": "string",
+          "description": "A requirements file of extra packages for the synthetic image, for example SDV (installed by your team, which accepts its licence directly)."
+        },
+        "mode": {
+          "enum": [
+            "flat",
+            "relational"
+          ],
+          "description": "flat (default): one table, the source as training reads it. relational: the entity table and its child tables learned together in one model, the feature tables of data.features_from (history per entity) and synthetic.sequences (events per entity); keys stay consistent and history keeps its timing against each cut-off."
+        },
+        "output_tables": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "relational: the output table (in outputs.bigquery.tables) of each child table, by its name: a feature table by its feature group or table name, a sequence by its name. Each holds the child's columns and run_id."
+        },
+        "sequences": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "source_uri",
+              "key",
+              "order_by"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,62}$",
+                "description": "The child table's name (output_tables uses it)."
+              },
+              "source_uri": {
+                "type": "string",
+                "description": "The event table, bq://project.dataset.table. Only rows of the source's entities are read."
+              },
+              "key": {
+                "type": "string",
+                "description": "The column that refers to the entity table's key."
+              },
+              "order_by": {
+                "type": "string",
+                "description": "The column the events are ordered by within each entity (usually a timestamp)."
+              },
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The columns to learn and generate (default all). Keys and personal data among them are never learned as values."
+              }
+            }
+          },
+          "description": "relational: event tables per entity, beyond the feature tables (for example transactions or sessions), generated in order with the entity table."
+        }
+      }
+    },
+    "retraining": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "what drift or a performance drop does: off (alerts only), propose (a person decides), candidate (trains a candidate, never promotes)",
+      "properties": {
+        "mode": {
+          "enum": [
+            "off",
+            "propose",
+            "candidate",
+            false
+          ],
+          "description": "off (alerts only), propose (a case opens and a person decides) or candidate (trains a candidate that is never promoted). Write \"off\" in quotes, since YAML reads a bare off as false (which also means off)."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "The older switch. true means mode propose, false means off."
+        },
+        "when": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "schedule",
+              "drift",
+              "performance"
+            ]
+          },
+          "description": "What may open a retrain case (schedule, drift, performance). The key is `when`, not `on`, because YAML reads on as true."
+        },
+        "cooldown_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Days after an approved retrain during which new alerts are recorded but open no case."
+        },
+        "source_uri": {
+          "type": "string",
+          "description": "The training data an approved retrain uses by default; an approver may choose another."
+        },
+        "loop": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The closed retrain loop: production never trains. An approved case here is trained in the environment this one's releases come from (environments/<env>.yaml promotion.from), on this environment's data through a read-only grant, compared with the model this environment serves, validated by a scoring run there, then promoted, approved and verified here. `pipewright loop` drives it.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Switch the closed retrain loop on, usually only in production (environments/<env> file). Off, an approved case trains in this environment, as in 1.0."
+            }
+          }
+        },
+        "decisions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "notify": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+              },
+              "description": "Who is emailed a case's summary and ID. Email never approves anything."
+            },
+            "publish": {
+              "type": "boolean",
+              "description": "Whether decision events also go to the tenant's decision feed (a subscription the platform provides)."
+            },
+            "escalate_after_days": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Days without a decision before the case is escalated."
+            },
+            "escalate_notify": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+              },
+              "description": "Who is emailed when a case is escalated."
+            },
+            "digest": {
+              "type": "boolean",
+              "description": "Whether a weekly summary of open cases and decisions is sent."
+            }
+          },
+          "description": "How people hear about a retrain case and how long they have to decide."
+        },
+        "approvals": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,30}$"
+              },
+              "description": "Approver groups registered by the platform (approver_groups in the manifest). One approval is needed from each."
+            },
+            "separate_from_requester": {
+              "type": "boolean",
+              "description": "Whether the person who asked for the retrain may also approve it."
+            }
+          },
+          "description": "Who must agree before a retrain runs."
+        },
+        "snooze": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "description": "The longest a case may be snoozed. The environment may set a lower cap."
+            },
+            "reopen_when_worse_by": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "A snoozed or declined case re-opens at once when the worst drift (PSI) rises by this much."
+            }
+          },
+          "description": "Putting off a decision."
+        }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "alerts": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Email for Pipewright events, set up by `pipewright alerts sync`.",
+          "properties": {
+            "notify": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+              },
+              "description": "Email addresses, distribution lists included."
+            },
+            "events": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "enum": [
+                  "monitoring.alert",
+                  "retrain.requested",
+                  "training.rejected",
+                  "training.evaluated",
+                  "model.registered"
+                ]
+              },
+              "description": "The events that send an email."
+            },
+            "severity": {
+              "enum": [
+                "CRITICAL",
+                "ERROR",
+                "WARNING"
+              ],
+              "description": "The severity of the alert policies."
+            }
+          }
+        },
+        "drift": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether drift is checked."
+            },
+            "method": {
+              "enum": [
+                "psi"
+              ],
+              "description": "How drift is measured (population stability index)."
+            },
+            "threshold": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "The drift above which a feature raises an alert. 0.2 is a common choice for PSI."
+            },
+            "features": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "The features checked. Left out, all of them."
+            }
+          },
+          "description": "Whether the scored data has moved away from the training data, feature by feature."
+        },
+        "prediction_drift": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether prediction drift is checked."
+            },
+            "threshold": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "The drift above which an alert is raised."
+            }
+          },
+          "description": "Whether the model's predictions have moved away from those at training time."
+        },
+        "performance": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether performance is checked."
+            },
+            "labels": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "table",
+                "key",
+                "label"
+              ],
+              "properties": {
+                "table": {
+                  "type": "string",
+                  "description": "The table of observed outcomes."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The column that joins outcomes to predictions."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The column holding the observed outcome."
+                }
+              },
+              "description": "Where the observed outcomes are."
+            },
+            "metric": {
+              "type": "string",
+              "description": "The metric computed on observed outcomes."
+            },
+            "min": {
+              "type": "number",
+              "description": "The value below which an alert is raised."
+            }
+          },
+          "description": "How the model does on outcomes observed after scoring."
+        },
+        "output_table": {
+          "type": "string",
+          "description": "The table monitoring results are written to."
+        }
+      }
+    },
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema"
+      ],
+      "properties": {
+        "schema": {
+          "type": "string",
+          "pattern": "\\.json$"
+        },
+        "partition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "field",
+            "type"
+          ],
+          "properties": {
+            "field": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "enum": [
+                "HOUR",
+                "DAY",
+                "MONTH",
+                "YEAR"
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "serving": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the model is served online. Needs online serving for the tenant."
+        },
+        "target": {
+          "enum": [
+            "vertex",
+            "kserve"
+          ],
+          "description": "Where it is served."
+        },
+        "features": {
+          "enum": [
+            "request",
+            "online"
+          ],
+          "description": "online: the endpoint takes entity IDs (data.features_from.entity.columns) and reads every feature from the tenant's online store, so serving, batch scoring and training share one feature definition (Pipewright 1.1). request (the default): callers send the feature values."
+        },
+        "machine": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The machine type, for example n1-standard-2."
+        },
+        "replicas": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The fewest replicas."
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The most replicas, reached under load."
+            }
+          },
+          "description": "How many replicas serve."
+        },
+        "canary_percent": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "The share of traffic a new version gets with `deploy-model --canary`."
+        }
+      }
+    },
+    "approvals": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "promote_model": {
+          "$ref": "#/$defs/approval_mode",
+          "description": "manual - a passing model is a candidate until `pipewright model approve`; auto - training makes it the default."
+        },
+        "deploy_model": {
+          "$ref": "#/$defs/approval_mode",
+          "description": "manual - `pipewright deploy-model` asks for --approve; auto - no confirmation."
+        },
+        "approvers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/principal"
+          },
+          "description": "Who may approve, as user:<email> or group:<email>."
+        }
+      }
+    },
+    "overrides": {
+      "description": "Keys that may vary per environment. Everything else is fixed so promotion compares like with like.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "parameters": {
+          "$ref": "#/$defs/parameters",
+          "description": "Values passed to every pipeline that declares a parameter of the same name. ${...} references to resources, model and manifest names are filled in."
+        },
+        "resources_per_step": {
+          "$ref": "#/$defs/steps",
+          "description": "The older name of `steps`, merged with it. Prefer `steps`."
+        },
+        "steps": {
+          "$ref": "#/$defs/steps",
+          "description": "Compute and behaviour per pipeline step, applied to the compiled pipeline; no pipeline code change needed."
+        },
+        "triggers": {
+          "$ref": "#/$defs/triggers",
+          "description": "What starts a run, and which pipeline it starts."
+        },
+        "training": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hyperparameters": {
+              "$ref": "#/$defs/hyperparameters",
+              "description": "Values the training step reads, by name (for example epochs, learning_rate)."
+            },
+            "tuning": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether training tunes before the final fit."
+                },
+                "max_trials": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "description": "The most trials in one run."
+                },
+                "parallel_trials": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 20,
+                  "description": "How many trials run at the same time."
+                }
+              },
+              "description": "Hyperparameter tuning, which runs several trials and keeps the best."
+            }
+          },
+          "description": "Hyperparameters, the experiment and tuning."
+        },
+        "model": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "serving": {
+              "$ref": "#/$defs/serving",
+              "description": "Online serving on an endpoint, deployed with `pipewright deploy-model`."
+            }
+          },
+          "description": "The model in the Model Registry and how it is served."
+        },
+        "approvals": {
+          "$ref": "#/$defs/approvals",
+          "description": "Which changes need a person."
+        },
+        "synthetic": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Synthetic data generation. Off unless enabled; with it off nothing is compiled, built or released for it.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Switches synthetic data on for this use case. May differ per environment (for example on in production-grade environments only)."
+            },
+            "rows": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "description": "How many rows to generate. Default: as many as the source has. May differ per environment."
+            },
+            "engine": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "max_training_minutes": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "The training time limit per candidate. May differ per environment."
+                }
+              },
+              "description": "The engine and its settings. Every candidate starts from these."
+            }
+          }
+        },
+        "retraining": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "The older switch. true means mode propose, false means off."
+            },
+            "mode": {
+              "enum": [
+                "off",
+                "propose",
+                "candidate",
+                false
+              ],
+              "description": "off (alerts only), propose (a case opens and a person decides) or candidate (trains a candidate that is never promoted). Write \"off\" in quotes, since YAML reads a bare off as false (which also means off)."
+            },
+            "loop": {
+              "$ref": "#/$defs/retraining/properties/loop",
+              "description": "The closed retrain loop: production never trains. An approved case here is trained in the environment this one's releases come from (environments/<env>.yaml promotion.from), on this environment's data through a read-only grant, compared with the model this environment serves, validated by a scoring run there, then promoted, approved and verified here. `pipewright loop` drives it."
+            },
+            "decisions": {
+              "$ref": "#/$defs/retraining/properties/decisions",
+              "description": "How people hear about a retrain case and how long they have to decide."
+            },
+            "approvals": {
+              "$ref": "#/$defs/retraining/properties/approvals",
+              "description": "Who must agree before a retrain runs."
+            },
+            "snooze": {
+              "$ref": "#/$defs/retraining/properties/snooze",
+              "description": "Putting off a decision."
+            }
+          },
+          "description": "What drift or a performance drop leads to, and who decides on a retrain."
+        },
+        "monitoring": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "alerts": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Email for Pipewright events, set up by `pipewright alerts sync`.",
+              "properties": {
+                "notify": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+                  },
+                  "description": "Email addresses, distribution lists included."
+                },
+                "events": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "enum": [
+                      "monitoring.alert",
+                      "retrain.requested",
+                      "training.rejected",
+                      "training.evaluated",
+                      "model.registered"
+                    ]
+                  },
+                  "description": "The events that send an email."
+                },
+                "severity": {
+                  "enum": [
+                    "CRITICAL",
+                    "ERROR",
+                    "WARNING"
+                  ],
+                  "description": "The severity of the alert policies."
+                }
+              }
+            }
+          },
+          "description": "Checks run on each inference, for drift, prediction drift and performance against observed outcomes."
+        },
+        "outputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "bigquery": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "retention_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Days before partitions are deleted."
+                }
+              },
+              "description": "BigQuery tables the use case owns, created and evolved by `pipewright tables sync` (additive changes only)."
+            }
+          },
+          "description": "Where the use case's tables are written."
+        }
+      }
+    }
+  }
+}

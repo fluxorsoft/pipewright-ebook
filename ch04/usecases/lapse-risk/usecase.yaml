@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=../../.pipewright-schemas/usecase.schema.json
+# lapse-risk: created from the Pipewright minimal example (pipewright new-usecase --from minimal).
+# Only what is required, plus one evaluation gate. Everything else has a default: `pipewright resolve --env <env>`
+# shows the result, `pipewright explain <key>` what any key means. The churn example shows every option.
+apiVersion: pipewright/v1
+kind: UseCase
+metadata:
+  name: lapse-risk
+  owner: ml-team
+
+spec:
+  tenant: retail                      # given to you by the platform team
+  include: [config/*.yaml]               # config/data.yaml: the data contract, label and split
+
+  pipelines:
+    training: { file: training_pipeline.py, function: churn_training_pipeline }
+  components: { dir: components/, requirements: components/requirements.txt }
+
+  model:
+    name: lapse-risk-classifier
+
+  triggers:
+    api: true                            # `pipewright run --source-uri bq://<entity table>`; a file cannot be one
+
+  parameters:                            # the training pipeline's own parameters
+    bq_dataset: ${resources.bigquery_dataset}
+    model_display_name: ${model.name}
+    raw_table: lapse_risk_raw_customers
+    metrics_table: lapse_risk_model_metrics
+
+  evaluation:
+    gates:
+      - { metric: auc, min: 0.7 }        # a model below this is not registered
+
+  outputs:                               # tables the pipeline writes, created by `pipewright tables sync`
+    bigquery:
+      tables:
+        lapse_risk_raw_customers: { schema: schemas/raw_customers.json, partition: { field: ingested_at, type: DAY } }
+        lapse_risk_model_metrics: { schema: schemas/model_metrics.json, partition: { field: evaluated_at, type: DAY } }
