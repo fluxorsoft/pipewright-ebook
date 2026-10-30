@@ -16,7 +16,10 @@ purchases AS (                                          -- a purchase a cancella
     WHERE c.cancelled AND c.customer_id = p.customer_id AND c.stock_code = p.stock_code AND c.quantity = p.quantity)
 ),
 top10 AS (                                              -- by how many orders, so one bulk order cannot make the list
-  SELECT stock_code FROM purchases GROUP BY stock_code ORDER BY COUNT(DISTINCT invoice) DESC LIMIT 10
+  SELECT stock_code FROM purchases
+  WHERE stock_code != '47566'   -- party bunting: out of stock in July and August 2010, so its sales there are not its
+                                -- demand; left out until the stock-out weeks are handled (Chapter 8)
+  GROUP BY stock_code ORDER BY COUNT(DISTINCT invoice) DESC LIMIT 10
 ),
 weeks AS (
   SELECT w AS week_start

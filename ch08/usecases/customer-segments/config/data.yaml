@@ -20,5 +20,8 @@ data:
       - table: bq://pw_retail.customer_activity
         features: [recency_days, orders_12m, spend_12m_gbp, distinct_products]
 
+features:
+  exclude: [snapshot_date]               # the cut-off is when, not who: never a feature (see Chapter 8)
+
 data_protection:
   personal_data_columns: [customer_id]   # never a feature
