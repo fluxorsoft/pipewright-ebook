@@ -5,11 +5,16 @@
 --
 -- Every month has a row, up to the latest. Rows whose 90-day window has not closed yet are dropped at each run, so
 -- the same table serves every run as the months go by.
+--
+-- Cut-offs start in December 2010, the first with a full year of transactions behind it (they start on
+-- 2009-12-01). Earlier cut-offs had features over less than the 365 days they claim: recency could not exceed the
+-- months since the data began. Monitoring found it (Chapter 14): the training data's recency was too short, so
+-- every 2011 scoring looked drifted.
 CREATE OR REPLACE TABLE `pw_retail.lapse_risk_entities`
 AS
 WITH cutoffs AS (
   SELECT d AS snapshot_date, TIMESTAMP(d) AS cutoff
-  FROM UNNEST(GENERATE_DATE_ARRAY('2010-06-01', '2011-12-01', INTERVAL 1 MONTH)) AS d
+  FROM UNNEST(GENERATE_DATE_ARRAY('2010-12-01', '2011-12-01', INTERVAL 1 MONTH)) AS d
 ),
 purchases AS (
   SELECT *
