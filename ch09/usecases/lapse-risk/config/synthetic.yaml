@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../../../.pipewright-schemas/usecase-part.schema.json
+# Synthetic data: a copy of the lapse model's training rows that can leave the company (Chapter 6).
+synthetic:
+  enabled: true
+  purpose: sharing                       # it leaves the organisation: the stricter privacy gates
+  tier: learned                          # an engine learns from the real rows, inside this environment
+  source_uri: bq://pw_retail.lapse_risk_synthetic_source   # one training run's labelled rows
+  output_table: lapse_risk_synthetic     # in outputs.bigquery.tables
+  rows: 20000
+  engine: { type: mostlyai, model: MOSTLY_AI/Small, max_training_minutes: 15 }
+  columns:                               # decided by rules, never learned
+    customer_id: { rule: key, prefix: "SYN-" }
+    snapshot_date: { rule: time, from: "2010-06-01", to: "2011-09-01", step: day }   # used by the contract tier
+
+data_protection:
+  personal_data_columns: [customer_id]   # never learned, never copied

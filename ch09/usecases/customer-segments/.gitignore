@@ -1,0 +1,5 @@
+# Pipewright build output and Python caches
+.pipewright/
+__pycache__/
+*.pyc
+.pytest_cache/

@@ -1,0 +1,2 @@
+approvals:
+  promote_model: auto                   # in test, a model that passes its gates becomes the champion at once
