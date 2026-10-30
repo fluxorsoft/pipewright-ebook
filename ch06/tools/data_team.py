@@ -56,6 +56,7 @@ else:
             sys.exit(f"{name}: {reason}")
         steps = list(client.list_jobs(parent_job=job.job_id)) if job.statement_type == "SCRIPT" else [job]
         changed = sum(s.num_dml_affected_rows or 0 for s in steps if s.statement_type in ("INSERT", "MERGE"))
-        made = [s.destination.table_id for s in steps if s.statement_type == "CREATE_TABLE_AS_SELECT"]
+        made = [s.destination.table_id if s.destination else "a view" for s in steps
+                if s.statement_type in ("CREATE_TABLE_AS_SELECT", "CREATE_VIEW")]
         what = f"created {', '.join(made)}" if made else f"{changed:,} rows added"
         print(f"{name}: {what}, {job.total_bytes_processed or 0:,} bytes processed")
