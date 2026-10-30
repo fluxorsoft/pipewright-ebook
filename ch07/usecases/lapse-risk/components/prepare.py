@@ -24,7 +24,7 @@ def prepare_data(
     from collections import namedtuple
 
     import pandas as pd
-    from mlkit import impute, numeric_features, split_frame
+    from mlkit import fill_missing, numeric_features, split_frame
 
     logging.basicConfig(level=logging.INFO)
     data, features = ml_config["data"], ml_config["features"]["include"]
@@ -32,7 +32,7 @@ def prepare_data(
     df = pd.read_parquet(raw_data.path).dropna(subset=[label]).reset_index(drop=True)
     train, val, test = split_frame(df, data["split"], label)
     medians = numeric_features(train, features).median().to_dict()
-    train, val, test = (impute(x, features, medians) for x in (train, val, test))
+    train, val, test = (fill_missing(x, features, medians) for x in (train, val, test))
 
     for frame, out in ((train, train_data), (val, validation_data), (test, test_data)):
         frame.to_parquet(out.path, index=False)

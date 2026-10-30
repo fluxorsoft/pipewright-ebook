@@ -28,6 +28,9 @@ spec:
     raw_table: lapse_risk_raw_customers
     metrics_table: lapse_risk_model_metrics
 
+  tests:
+    command: python tests/check_imports.py   # `pipewright test`, and CI before every release (Chapter 15)
+
   evaluation:
     gates:
       - { metric: auc, min: 0.7 }        # a model below this is not registered
