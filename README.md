@@ -13,6 +13,7 @@ chapter changed, for example `diff -r ch04 ch05`.
 | `ch05/` | Chapter 5. Reproducible runs | the label from purchase events, per-run snapshots, every setting in one file (`reference/`) |
 | `ch06/` | Chapter 6. Synthetic data for MLOps | a synthetic copy of the training rows, gated for sharing |
 | `ch07/` | Chapter 7. Pipelines that release like software | `tests.command` with an import check (`tests/check_imports.py`), the renamed helper fixed |
+| `ch08/` | Chapter 8. Models for SQL teams | `customer-segments` (k-means) and `demand-forecast` (ARIMA_PLUS) in BigQuery ML: YAML and SQL only |
 
 Every folder is a Pipewright repository root: run `pipewright` commands from inside it.
 
