@@ -10,7 +10,9 @@ monitoring:
   drift: { enabled: true, method: psi, threshold: 0.2 }   # each feature against its training distribution
   prediction_drift: { enabled: true, threshold: 0.2 }     # the scores themselves against training's
   performance:                           # once outcomes are known: the model measured on what customers did
-    enabled: true
+    enabled: false                       # off: Pipewright 1.1 joins outcomes to each customer's latest score, which
+                                         # is the wrong score once a newer week is scored. sql/performance.sql joins on
+                                         # customer and cut-off instead (Chapter 14)
     labels: { table: lapse_risk_outcomes, key: customer_id, label: returned }   # sql/lapse_risk_outcomes.sql
     metric: auc
     min: 0.7                             # below this the model no longer ranks customers usefully

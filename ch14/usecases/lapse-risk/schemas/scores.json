@@ -38,5 +38,11 @@
     "name": "scored_at",
     "type": "TIMESTAMP",
     "mode": "REQUIRED"
+  },
+  {
+    "name": "scored_for",
+    "type": "DATE",
+    "mode": "NULLABLE",
+    "description": "the cut-off the score is for (the entity's snapshot_date)"
   }
 ]
