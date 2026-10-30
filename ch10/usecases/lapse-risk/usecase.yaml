@@ -48,11 +48,15 @@ spec:
     slice_gates:
       - { metric: auc, max_gap: 0.05, min_rows: 100 }   # no country with 100+ test rows may be 0.05 worse
     fairness:
-      attributes: [country]              # measured, never trained on
+      attributes: [country]              # measured, never trained on; all three measures are recorded
       min_rows: 100
       gates:
-        - { metric: demographic_parity_difference, max: 0.1 }
-        - { metric: equal_opportunity_difference, max: 0.1 }
+        # Reviewed with data protection after the first measurement (Chapter 10): the model chooses who gets a
+        # win-back discount. Customers abroad genuinely come back more often, so equal selection rates
+        # (demographic_parity_difference) would send offers to the wrong people: measured, not gated. What matters
+        # is that returners are recognised alike in every country; a miss costs the retailer a discount, not the
+        # customer, so the gap may be up to 0.15.
+        - { metric: equal_opportunity_difference, max: 0.15 }
 
   outputs:                               # tables the pipeline writes, created by `pipewright tables sync`
     bigquery:
