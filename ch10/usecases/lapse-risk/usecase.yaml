@@ -1,0 +1,63 @@
+# yaml-language-server: $schema=../../.pipewright-schemas/usecase.schema.json
+# lapse-risk: created from the Pipewright minimal example (pipewright new-usecase --from minimal).
+# Only what is required, plus one evaluation gate. Everything else has a default: `pipewright resolve --env <env>`
+# shows the result, `pipewright explain <key>` what any key means. The churn example shows every option.
+apiVersion: pipewright/v1
+kind: UseCase
+metadata:
+  name: lapse-risk
+  owner: ml-team
+
+spec:
+  tenant: retail                      # given to you by the platform team
+  include: [config/*.yaml]               # config/data.yaml: the data contract, label and split
+
+  pipelines:
+    training: { file: training_pipeline.py, function: churn_training_pipeline }
+  components: { dir: components/, requirements: components/requirements.txt }
+
+  model:
+    name: lapse-risk-classifier
+
+  triggers:
+    api: true                            # `pipewright run --source-uri bq://<entity table>`; a file cannot be one
+
+  parameters:                            # the training pipeline's own parameters
+    bq_dataset: ${resources.bigquery_dataset}
+    model_display_name: ${model.name}
+    raw_table: lapse_risk_raw_customers
+    metrics_table: lapse_risk_model_metrics
+
+  tests:
+    command: python tests/check_imports.py   # `pipewright test`, and CI before every release (Chapter 15)
+
+  steps:                                 # compute per step (Chapter 9)
+    train-model: { cpu: 4, memory: 16G }
+
+  evaluation:
+    primary_metric: auc                  # what "better" means, for the gates and the champion
+    decision_threshold: 0.5              # a score above this counts as "will come back"
+    gates:
+      - { metric: auc, min: 0.7 }        # a model below this is not registered
+      - { metric: calibration_error, max: 0.05 }    # its scores must mean what they say
+    champion:
+      enabled: true                      # a new model must beat the one in use, on the same test rows
+      metric: auc
+      min_improvement: 0.0
+    slices: [country]                    # also measured per country
+    slice_gates:
+      - { metric: auc, max_gap: 0.05, min_rows: 100 }   # no country with 100+ test rows may be 0.05 worse
+    fairness:
+      attributes: [country]              # measured, never trained on
+      min_rows: 100
+      gates:
+        - { metric: demographic_parity_difference, max: 0.1 }
+        - { metric: equal_opportunity_difference, max: 0.1 }
+
+  outputs:                               # tables the pipeline writes, created by `pipewright tables sync`
+    bigquery:
+      tables:
+        lapse_risk_raw_customers: { schema: schemas/raw_customers.json, partition: { field: ingested_at, type: DAY } }
+        lapse_risk_model_metrics: { schema: schemas/model_metrics.json, partition: { field: evaluated_at, type: DAY } }
+        lapse_risk_snapshots: { schema: schemas/snapshots.json, partition: { field: ingested_at, type: DAY } }
+        lapse_risk_synthetic: { schema: schemas/synthetic.json }
