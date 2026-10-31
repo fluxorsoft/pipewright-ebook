@@ -1,0 +1,57 @@
+# Promote a tested release, and the model it trained, from test to production (Chapter 16). Started by hand once the
+# release is live in test and a model it trained is test's champion. Only people with write access can start it, and
+# the run records who did. On GitHub Team or Enterprise (or a public repository), add required reviewers to the `prod`
+# environment and the job also waits until one of them approves. Production's own policy (promote_model manual) still
+# needs `approve_model` for the model to become production's champion.
+name: pipewright-promote
+run-name: promote ${{ inputs.usecase }} to prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      usecase:
+        description: Use case to promote
+        type: string
+        required: true
+      approve_model:
+        description: "Also make the promoted model production's champion (prod's promote_model policy is manual)"
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  id-token: write          # Workload Identity Federation
+
+concurrency:
+  group: pipewright-promote
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: prod        # its variables; its required reviewers, where the plan allows them
+    env:
+      UC: ${{ inputs.usecase }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # promote checks out the release's own commit
+      - uses: ./.github/actions/pipewright-setup
+        with:
+          wif_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.PIPEWRIGHT_SERVICE_ACCOUNT }}
+          pip_spec: ${{ vars.PIPEWRIGHT_PIP_SPEC }}
+          pip_index: ${{ vars.PIPEWRIGHT_PIP_INDEX }}
+          setup_tools: ${{ vars.PIPEWRIGHT_SETUP_TOOLS }}
+      - name: Promote
+        run: |
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          pipewright promote --from test --to prod --usecase "$UC" \
+              ${{ inputs.approve_model && '--approve' || '' }} 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          # A use case that retrains in production (model.promotion: retrain) has no model there until it trains.
+          pipewright model list --env prod --usecase "$UC" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

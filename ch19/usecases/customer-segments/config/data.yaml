@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=../../../.pipewright-schemas/usecase-part.schema.json
+# Who is segmented, as of when, and the features they are segmented on: the data team's feature table, read point in
+# time as in Chapter 4. There is no label: segments are found, not predicted.
+data:
+  contract:
+    min_rows: 1000
+    unique: [customer_id, snapshot_date]
+    columns:
+      - { name: customer_id,       type: string,  required: true, max_null_fraction: 0 }
+      - { name: snapshot_date,     type: date,    required: true, max_null_fraction: 0 }
+      - { name: recency_days,      type: integer, min: 0, max: 365 }
+      - { name: orders_12m,        type: integer, min: 1 }
+      - { name: spend_12m_gbp,     type: float,   min: 0 }
+      - { name: distinct_products, type: integer, min: 1 }
+  label: { task: clustering }
+  split: { strategy: random, test_fraction: 0.2 }
+  features_from:
+    entity: { columns: [customer_id], time_column: snapshot_date }
+    sources:
+      - table: bq://pw_retail.customer_activity
+        features: [recency_days, orders_12m, spend_12m_gbp, distinct_products]
+
+features:
+  exclude: [snapshot_date]               # the cut-off is when, not who: never a feature (see Chapter 8)
+
+data_protection:
+  personal_data_columns: [customer_id]   # never a feature

@@ -24,6 +24,7 @@ chapter changed, for example `diff -r ch04 ch05`.
 | `ch16/` | Chapter 16. CI/CD and approvals in GitHub | `.github/`: PR checks, release to test on merge, a promote workflow for production, operate; the CI constraints file; `platform/github-ci.sh` (Workload Identity Federation) |
 | `ch17/` | Chapter 17. Lineage: every model's full story | rows sorted by the contract key before training (exact replays), `data_protection.erasure`, `platform/evidence.tf` (the event log) |
 | `ch18/` | Chapter 18. Evidence, audit and running a fleet | `tools/fleet_report.py`: one HTML page with charts for every use case in every environment (live releases, champions, training runs, drift, compute, decisions) |
+| `ch19/` | Chapter 19. From endpoint to app | `app/`: the checkout offer service (FastAPI): the weekly score, a fresh score from the request-mode endpoint, the business rule `OFFER_AT`, a one-page front end and a `Dockerfile` |
 
 Every folder is a Pipewright repository root: run `pipewright` commands from inside it.
 
