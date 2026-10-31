@@ -1,0 +1,4 @@
+# The toolchain CI installs next to Pipewright, held to the versions the releases were tested with (Chapter 16).
+# kfp must match the minor version pinned in each use case's components/requirements.txt: Pipewright refuses to
+# compile otherwise. Change both together, in one pull request.
+kfp==2.17.*
