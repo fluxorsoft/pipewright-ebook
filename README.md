@@ -1,7 +1,6 @@
 # retailer-mlops
 
-The MLOps repository of the UK online gift retailer in *Governed MLOps on Google Cloud*, built with Pipewright
-1.1.0. Each folder is the whole repository as it stands at the end of one chapter, ready to run: open the folder of
+The MLOps repository of the UK online gift retailer in *Governed MLOps on Google Cloud*, for Pipewright 1.2.0. Each folder is the whole repository as it stands at the end of one chapter, ready to run: open the folder of
 the chapter you are reading and follow its **Try it** section there. Comparing two folders shows exactly what a
 chapter changed, for example `diff -r ch04 ch05`.
 
@@ -26,11 +25,12 @@ chapter changed, for example `diff -r ch04 ch05`.
 | `ch18/` | Chapter 18. Evidence, audit and running a fleet | `tools/fleet_report.py`: one HTML page with charts for every use case in every environment (live releases, champions, training runs, drift, compute, decisions) |
 | `ch19/` | Chapter 19. From endpoint to app | `app/`: the checkout offer service (FastAPI): the weekly score, a fresh score from the request-mode endpoint, the business rule `OFFER_AT`, a one-page front end and a `Dockerfile`; `FEATURES=online` asks by customer ID alone, from the online store (Pipewright 1.2.0) |
 
-Every folder is a Pipewright repository root: run `pipewright` commands from inside it. The chapters were built
-with Pipewright 1.1.0; Chapter 19's online path (`FEATURES=online`) needs 1.2.0, which runs every folder unchanged.
+Every folder is a Pipewright repository root: run `pipewright` commands from inside it. The chapters were first
+built with Pipewright 1.1.0 and run unchanged on 1.2.0; where 1.2.0 changed something a chapter met, the book says so
+in a note marked **Since Pipewright 1.2.0**.
 
 ```bash
-pip install "pipewright-mlops[gcp]==1.1.0"
+pip install "pipewright-mlops[gcp]==1.2.0"
 cd ch06
 pipewright validate --env test
 pipewright doctor --env test
