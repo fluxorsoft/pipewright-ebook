@@ -1,0 +1,14 @@
+{
+  "customer_activity": {
+    "description": "One row per customer per month: what the customer did in the 365 days before feature_timestamp. Owned by the data team.",
+    "table": "customer_activity",
+    "entity": ["customer_id"],
+    "features": {
+      "recency_days": "Days since the customer's last order",
+      "orders_12m": "Orders in the year",
+      "spend_12m_gbp": "Spend in the year, GBP",
+      "distinct_products": "Different products bought in the year",
+      "avg_days_between_orders": "Average days between orders in the year; empty for a customer with one order"
+    }
+  }
+}
