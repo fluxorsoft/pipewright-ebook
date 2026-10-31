@@ -52,5 +52,6 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           pipewright promote --from test --to prod --usecase "$UC" \
               ${{ inputs.approve_model && '--approve' || '' }} 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
-          pipewright model list --env prod --usecase "$UC" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          # A use case that retrains in production (model.promotion: retrain) has no model there until it trains.
+          pipewright model list --env prod --usecase "$UC" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"

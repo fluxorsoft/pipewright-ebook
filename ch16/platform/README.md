@@ -39,3 +39,16 @@ the view reads it.
 
 The store is Bigtable: it is billed every hour it exists and cannot scale to zero. Take the block out of
 `terraform.tfvars` and apply when you are done; the plan destroys the store, its view and its grant.
+
+## github-ci.sh: an identity for CI (Chapter 16)
+
+`github-ci.sh` creates, in each environment's project, a Workload Identity pool and a GitHub provider that trust one
+repository, a `pw-github-ci` service account that repository's workflows may act as, and, in production, read access to
+test's images, artifacts and models for promotion. Read it, then run it as a project owner with `REPO`, `TEST_PROJECT`
+and `PROD_PROJECT` set. Then add the service account to `operators` in each environment's `terraform.tfvars`, plan,
+review and apply, and put the two values it prints in the GitHub environments' variables.
+
+The starter's operators also need three read-only roles for `pipewright doctor` (`roles/run.viewer`,
+`roles/pubsub.viewer`, and `roles/storage.legacyBucketReader` on the artifacts and landing buckets) and
+`roles/pubsub.publisher` on the events topic, so CI's releases reach the event log. Pipewright's next starter grants
+them; for 1.1.0, add them to `identities.tf` as the book's environment did.

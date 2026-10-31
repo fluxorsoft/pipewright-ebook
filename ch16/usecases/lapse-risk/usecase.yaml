@@ -42,7 +42,7 @@ spec:
     metrics_table: lapse_risk_model_metrics
 
   tests:
-    command: python tests/check_imports.py   # `pipewright test`, and CI before every release (Chapter 15)
+    command: python tests/check_imports.py   # `pipewright test`, and CI on every pull request (Chapters 7 and 16)
 
   steps:                                 # compute per step (Chapter 9)
     train-model: { cpu: 4, memory: 16G }
