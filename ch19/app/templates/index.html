@@ -69,7 +69,7 @@ document.getElementById("f").addEventListener("submit", async (e) => {
     const f = d.fresh;
     cards.innerHTML += f.available
       ? card("Fresh, from the endpoint", f.lapse_risk, [["features as of", f.features_as_of], ["model", "v" + f.model_version],
-          ["endpoint call", f.millis + " ms"], ["filled with median", f.filled_with_median.join(", ") || "none"]],
+          ["endpoint call", f.millis + " ms"], ["filled with median", f.filled_with_median ? (f.filled_with_median.join(", ") || "none") : "by the endpoint, not reported"]],
           "Features read now and prepared as in training.")
       : card("Fresh, from the endpoint", null, [["", f.why]], "");
   }
