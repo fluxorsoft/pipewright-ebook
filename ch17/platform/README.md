@@ -52,3 +52,11 @@ The starter's operators also need three read-only roles for `pipewright doctor` 
 `roles/pubsub.viewer`, and `roles/storage.legacyBucketReader` on the artifacts and landing buckets) and
 `roles/pubsub.publisher` on the events topic, so CI's releases reach the event log. Pipewright's next starter grants
 them; for 1.1.0, add them to `identities.tf` as the book's environment did.
+
+## evidence.tf: keep the event log (Chapter 17)
+
+Pipewright publishes every lifecycle event, including every decision (promotions, approvals, deployments, rollbacks,
+retrain decisions, erasures), to the environment's `events` topic. The 1.1.0 starter creates the topic but nothing
+subscribes to it, and Pub/Sub discards what nobody subscribes to. Copy `evidence.tf` into the starter's folder, plan,
+review and apply: it creates a `<prefix>_evidence` dataset, an append-only `events` table, a BigQuery subscription on
+the topic, and read access for the operators. Events are kept from then on; earlier ones cannot be recovered.
