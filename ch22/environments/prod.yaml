@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=../.pipewright-schemas/environment.schema.json
+# Production: the platform team's prod environment (its manifest lives in its own project). Releases arrive here only
+# by promotion from test (Chapter 12): what was tested is what ships.
+apiVersion: pipewright/v1
+kind: Environment
+metadata: { name: prod }
+spec:
+  manifest: gs://pw-ebook-prod-pw-artifacts/pipewright/environment.json
+  promotion: { from: test }

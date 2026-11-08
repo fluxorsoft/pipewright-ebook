@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "pipewright": {
+      "command": "pipewright",
+      "args": ["mcp", "--env", "test", "--tenant", "retail"]
+    }
+  }
+}
