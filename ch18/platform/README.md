@@ -1,5 +1,7 @@
 # platform/: the online store the starter does not create yet (Chapter 13)
 
+**Pipewright 1.2.0 and later: skip the Terraform here.** The starter has its own `online_features.tf` and `evidence.tf`, and its `variables.tf` and `manifest.tf` already take the `online_features` block and the evidence settings: copying these files in would declare the same resources twice, and the plan fails. Add the block to `terraform.tfvars`, plan, review and apply, then start the view's first sync with `pipewright features sync --env <env> --usecase lapse-risk` (FR-110). The steps below are for a 1.1.0 starter.
+
 Pipewright 1.1.0's starter writes no online store, so Chapter 13 adds one to the starter by hand. Three changes, in
 your copy of pipewright-starter:
 
