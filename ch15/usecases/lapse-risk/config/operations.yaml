@@ -24,7 +24,7 @@ monitoring:
 # Deciding about it (Chapter 15): drift opens a retrain case; a person decides. Nothing retrains by itself.
 retraining:
   mode: propose                          # off: alerts only | propose: a case for a person | candidate: trains, never promotes
-  when: [drift]                          # what opens a case (performance too, once FR-78 is fixed)
+  when: [drift]                          # what opens a case; performance too, with labels.time_column (Pipewright 1.2.0)
   cooldown_days: 7                       # after an approved retrain, alerts are recorded but open no new case
   source_uri: bq://pw_retail.lapse_risk_entities   # what a retrain would train on; the approver may choose another
   decisions:
