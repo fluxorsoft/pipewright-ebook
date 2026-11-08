@@ -150,6 +150,9 @@ def fresh(customer: str) -> dict:
         return {"available": False, "why": f"the endpoint answered HTTP {answer.status_code}"}
     body = answer.json()
     probability = body["predictions"][0]
+    if not isinstance(probability, (int, float)):         # fail closed: an answer that is not a score is no score
+        log.warning("endpoint answered no score")
+        return {"available": False, "why": f"the endpoint answered no score: {str(probability)[:200]}"}
     return {"available": True, "lapse_risk": round(1 - probability, 3), "model_version": body["modelVersionId"],
             "features_as_of": f"{row['feature_timestamp']:%Y-%m-%d}", "filled_with_median": filled,
             "features": dict(zip(model["features"], instance)), "millis": millis}
