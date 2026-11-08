@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=../../../.pipewright-schemas/usecase-part.schema.json
+# Drafted by `pipewright new-usecase --from-bq pw-ebook.pw_retail.retail_entities`: review it before the first run.
+# Add what the table's schema cannot say: ranges (min, max), allowed values, unique keys and min_rows.
+data:
+  contract:
+    columns:
+      - { name: customer_id,             type: string }
+      - { name: snapshot_date,           type: date }
+      - { name: churned,                 type: integer, allowed: [0, 1] }
+      - { name: recency_days,            type: integer }
+      - { name: orders_12m,              type: integer }
+      - { name: spend_12m_gbp,           type: float }
+      - { name: distinct_products,       type: integer }
+      - { name: avg_days_between_orders, type: float }
+  label: { column: churned }
+  split: { strategy: time, time_column: snapshot_date }       # the newest rows are the test set
+  features_from:                       # features as they were at each row's cut-off
+    entity: { columns: [customer_id], time_column: snapshot_date }
+    sources:
+      - { feature_group: customer_activity, features: [recency_days, orders_12m, spend_12m_gbp, distinct_products, avg_days_between_orders] }
+
+features:
+  include: [recency_days, orders_12m, spend_12m_gbp, distinct_products, avg_days_between_orders]
+
+data_protection:
+  personal_data_columns: []             # columns that identify a person: never features, erasable
+  # review: customer_id looks like an identifier

@@ -1,0 +1,5 @@
+# Production differs from test only where it should: a person makes a model the champion (the platform's policy says
+# so too) and deploys it. The data contract, the features and the gates are the same in every environment (Chapter 2).
+approvals:
+  promote_model: manual
+  deploy_model: manual

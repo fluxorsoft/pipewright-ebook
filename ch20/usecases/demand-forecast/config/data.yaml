@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../../../.pipewright-schemas/usecase-part.schema.json
+# The series: units sold per product per week. Training holds out the latest 20% of weeks, forecasts them and
+# measures the forecast against what really sold, then refits on every week before registering.
+data:
+  contract:
+    min_rows: 500
+    unique: [stock_code, week_start]
+    columns:
+      - { name: stock_code, type: string,  required: true, max_null_fraction: 0 }
+      - { name: week_start, type: date,    required: true, max_null_fraction: 0 }
+      - { name: units,      type: integer, min: 0, max_null_fraction: 0 }
+  label: { column: units, task: forecast }
+  split: { strategy: time, time_column: week_start, test_fraction: 0.2 }

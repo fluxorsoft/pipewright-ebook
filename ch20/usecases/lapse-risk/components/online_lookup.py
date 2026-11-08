@@ -1,0 +1,203 @@
+"""Read one or more entities' features from the online store a model was given (FR-51, FR-104).
+
+This file is copied, unchanged, next to a use case's serving handler (the churn example's
+components/online_lookup.py; a test keeps the copies identical), because the serving image does not install
+Pipewright. So it uses the Python standard library only and runs on Python 3.9 (the Agent Platform PyTorch serving
+image). It reads as the identity the serving container runs as, from the metadata server.
+
+    fetch_many(online, ["c-1", "c-2"]) -> {"c-1": {"tenure": 12.0, ...}, "c-2": {...}}
+
+`online` is the lookup the model carries (serving.json, or PIPEWRIGHT_ONLINE_FEATURES): without `type` it is the
+Bigtable online store of Pipewright 1.1; otherwise `bigquery`, `cloudsql` (through Pipewright's lookup service, its
+`url`) or `http` (the team's own store, the same contract). An entity the store does not have is left out of the
+answer; the handler then fills or refuses it. Errors name the store and the HTTP status, never an ID or a value.
+"""
+
+import json
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+_MD = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default"
+_cache = {}
+_lock = threading.Lock()
+
+
+def _metadata(path):
+    request = urllib.request.Request(_MD + path, headers={"Metadata-Flavor": "Google"})
+    with urllib.request.urlopen(request, timeout=10) as r:
+        return r.read()
+
+
+def access_token():
+    """An access token for Google APIs, reused until five minutes before it expires. The metadata server hands out
+    its current token, which may have far less than an hour left (found live in 1.4.2: a fixed 25-minute reuse sent
+    expired tokens)."""
+    with _lock:
+        hit = _cache.get("access")
+        if hit and time.time() < hit[1]:
+            return hit[0]
+        got = json.loads(_metadata("/token"))
+        _cache["access"] = (got["access_token"], time.time() + max(int(got.get("expires_in", 0)) - 300, 0))
+        return got["access_token"]
+
+
+def id_token(audience):
+    """An ID token for a lookup service or the team's store, reused for 25 minutes."""
+    with _lock:
+        key = "id:" + audience
+        hit = _cache.get(key)
+        if hit and time.time() - hit[1] < 1500:
+            return hit[0]
+        token = _metadata("/identity?audience=" + urllib.parse.quote(audience, safe="")).decode("utf-8")
+        _cache[key] = (token, time.time())
+        return token
+
+
+def _post(url, body, token, timeout, what):
+    data = json.dumps(body).encode("utf-8")
+    request = urllib.request.Request(url, data=data, method="POST", headers={
+        "Authorization": "Bearer " + token, "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as r:
+            return json.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        reason = ""
+        try:                      # the API's reason code only (never its message, which may quote a value)
+            errors = (json.loads(e.read() or b"{}").get("error") or {}).get("errors") or [{}]
+            reason = errors[0].get("reason") or ""
+        except (ValueError, AttributeError):
+            pass
+        raise ValueError("the online store ({}) answered HTTP {}{}".format(
+            what, e.code, " ({})".format(reason) if reason else "")) from None
+    except (urllib.error.URLError, OSError) as e:
+        raise ValueError("the online store ({}) did not answer: {}".format(what, type(e).__name__)) from None
+
+
+def _value(v):
+    for kind in ("doubleValue", "int64Value", "boolValue", "stringValue"):
+        if kind in v:
+            return float(v[kind]) if kind not in ("stringValue", "boolValue") else v[kind]
+    return None
+
+
+def _bigtable(online, ids):
+    """Pipewright 1.1: one call per entity and feature view."""
+    out = {}
+    region = online["store"].split("/")[3]
+    for entity in ids:
+        values = {}
+        for view in online["views"]:
+            url = "https://{}-aiplatform.googleapis.com/v1/{}/featureViews/{}:fetchFeatureValues".format(
+                region, online["store"], view["view"])
+            try:
+                found = _post(url, {"dataKey": {"key": str(entity)}, "dataFormat": "KEY_VALUE"}, access_token(), 10,
+                              "view " + view["view"])
+            except ValueError as e:
+                if "HTTP 404" in str(e):
+                    values = None
+                    break
+                raise
+            got = {f["name"]: _value(f.get("value") or {})
+                   for f in (found.get("keyValues") or {}).get("features") or []}
+            for name, fetched in view["features"].items():
+                values[name] = got.get(fetched)
+        if values is not None:
+            out[str(entity)] = values
+    return out
+
+
+def _bigquery(online, ids):
+    """One query for all the entities, served by BI Engine (short query mode, the result cache off)."""
+    names = online["features"]
+    sql = "SELECT {key}, {cols} FROM `{table}` WHERE {key} IN UNNEST(@ids)".format(
+        key=online["key"], cols=", ".join(names), table=online["table"])
+    body = {"query": sql, "useLegacySql": False, "useQueryCache": False, "location": online["location"],
+            "parameterMode": "NAMED", "timeoutMs": online.get("timeout_ms", 1000),
+            "queryParameters": [{"name": "ids", "parameterType": {"type": "ARRAY", "arrayType": {"type": "STRING"}},
+                                 "parameterValue": {"arrayValues": [{"value": str(i)} for i in ids]}}],
+            "jobCreationMode": "JOB_CREATION_OPTIONAL"}
+    if online.get("kms_key"):     # where the CMEK organization policy covers BigQuery (found live: HTTP 412 without)
+        body["destinationEncryptionConfiguration"] = {"kmsKeyName": online["kms_key"]}
+    url = "https://bigquery.googleapis.com/bigquery/v2/projects/{}/queries".format(online["project"])
+    got = _post(url, body, access_token(), max(2, online.get("timeout_ms", 1000) / 1000 + 1), "BigQuery")
+    if not got.get("jobComplete", True):
+        raise ValueError("the online store (BigQuery) did not answer within {} ms".format(online.get("timeout_ms")))
+    out = {}
+    for row in got.get("rows") or []:
+        cells = [c.get("v") for c in row["f"]]
+        values = zip(names, cells[1:])   # noqa: B905 - Python 3.9 in the serving image; BigQuery returns every column
+        out[str(cells[0])] = {n: (float(v) if v is not None else None) for n, v in values}
+    return out
+
+
+def _http(online, ids):
+    """Pipewright's lookup service (cloudsql) or the team's store (http): POST /lookup {entity_ids}."""
+    url = online["url"].rstrip("/") + "/lookup"
+    got = _post(url, {"entity_ids": [str(i) for i in ids]}, id_token(online.get("audience") or online["url"]),
+                online.get("timeout_ms", 1000) / 1000.0, "lookup " + online.get("type", "http"))
+    features = got.get("features")
+    if not isinstance(features, dict):
+        raise ValueError("the online store (lookup {}) answered without a features object".format(online["type"]))
+    wanted = set(online.get("features") or [])
+    out = {}
+    for entity, values in features.items():
+        if not isinstance(values, dict):
+            raise ValueError("the online store (lookup {}) answered an entity without a features object".format(
+                online["type"]))
+        unknown = sorted(set(values) - wanted - {online.get("key"), "feature_timestamp"}) if wanted else []
+        if unknown:
+            raise ValueError("the online store (lookup {}) answered features the model does not take: {}".format(
+                online["type"], ", ".join(unknown[:5])))
+        for name in wanted:
+            v = values.get(name)
+            if v is not None and not isinstance(v, (int, float)):
+                raise ValueError("the online store (lookup {}) answered {} as {}, not a number".format(
+                    online["type"], name, type(v).__name__))
+        out[str(entity)] = values
+    return out
+
+
+def service_url(online):
+    """The URL of Pipewright's lookup service, read once from the Cloud Run Admin API (the launcher lets the endpoint's
+    identity read and call that one service). A model's configuration is fixed when it is uploaded, the service's
+    URL only when the launcher creates it."""
+    key = "url:" + online["service"]
+    with _lock:
+        if key in _cache:
+            return _cache[key]
+    url = "https://run.googleapis.com/v2/projects/{}/locations/{}/services/{}".format(
+        online["project"], online["region"], online["service"])
+    request = urllib.request.Request(url, headers={"Authorization": "Bearer " + access_token()})
+    try:
+        with urllib.request.urlopen(request, timeout=10) as r:
+            uri = json.loads(r.read()).get("uri")
+    except urllib.error.HTTPError as e:
+        raise ValueError("the lookup service {} cannot be read (HTTP {}): has deploy-model created it?".format(
+            online["service"], e.code)) from None
+    if not uri:
+        raise ValueError("the lookup service {} has no URL yet".format(online["service"]))
+    with _lock:
+        _cache[key] = uri
+    return uri
+
+
+def fetch_many(online, ids):
+    """{entity ID: {feature: value}} for the entities the store has."""
+    kind = online.get("type", "bigtable")
+    if kind == "bigtable":
+        return _bigtable(online, ids)
+    if kind == "bigquery":
+        return _bigquery(online, ids)
+    if kind == "cloudsql":
+        if online.get("provider") == "own":
+            raise ValueError("this model's features are in Cloud SQL with the team's own lookup "
+                             "(lookup.provider own): the team's serving code reads them")
+        if not online.get("url"):
+            online = dict(online, url=service_url(online))
+        return _http(online, ids)
+    if kind == "http":
+        return _http(online, ids)
+    raise ValueError("unknown online store type {}".format(kind))

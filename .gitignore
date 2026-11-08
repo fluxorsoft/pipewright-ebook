@@ -2,3 +2,4 @@
 __pycache__/
 *.pyc
 **/data-team/data/
+.pipewright/mcp-log.jsonl
