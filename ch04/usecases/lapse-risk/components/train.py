@@ -61,13 +61,23 @@ def train_model(
         with open(os.path.join(model.path, name), "w") as f:
             json.dump(content, f, indent=2, default=str)
     extra = [os.path.join(model.path, "features.json")]
-    if ml_config.get("online_features"):        # model.serving.features online (Pipewright 1.1): views and key
-        with open(os.path.join(model.path, "serving.json"), "w") as f:
-            json.dump({"online_features": ml_config["online_features"]}, f, indent=2)
-        extra.append(os.path.join(model.path, "serving.json"))
+    # What the serving handler needs beside the network: the training medians, so an empty feature is filled online
+    # as batch scoring fills it (Pipewright 1.2.0, model.serving.fill_missing), and with model.serving.features online
+    # (Pipewright 1.1) the views and key, which the serving container's PIPEWRIGHT_ONLINE_FEATURES overrides.
+    serving = {"medians": stats["medians"],
+               "fill_missing": (ml_config.get("serving") or {}).get("fill_missing", True)}
+    if ml_config.get("online_features"):
+        serving["online_features"] = ml_config["online_features"]
+    if (ml_config.get("serving") or {}).get("pool"):      # Pipewright 1.4.2 (FR-105): read from the files only
+        serving["pool"] = ml_config["serving"]["pool"]
+    with open(os.path.join(model.path, "serving.json"), "w") as f:
+        json.dump(serving, f, indent=2, default=str)
+    extra.append(os.path.join(model.path, "serving.json"))
 
     # Agent Platform prebuilt PyTorch serving runs <artifact_uri>/model.mar with TorchServe.
     handler = os.path.join(os.path.dirname(os.path.abspath(__file__)), "torchserve_handler.py")
+    # The lookup client for the stores of Pipewright 1.4.2 (FR-104: bigquery, cloudsql, http), beside the handler.
+    extra.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "online_lookup.py"))
     with tempfile.TemporaryDirectory() as export_dir, tempfile.TemporaryDirectory() as scratch:
         # The archiver stages and deletes $TMPDIR/<model-name>: a private TMPDIR keeps it away from model.path.
         subprocess.run(
