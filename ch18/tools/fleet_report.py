@@ -46,9 +46,14 @@ def pipewright_json(*args) -> object | None:
                shutil.which("pipewright") or "pipewright")
     done = subprocess.run([exe, *args, "--json"], cwd=ROOT, capture_output=True, text=True)
     try:
-        return json.loads(done.stdout) if done.returncode == 0 else None
+        if done.returncode == 0:
+            return json.loads(done.stdout)
     except ValueError:
-        return None
+        pass
+    # Say so: a page that shows "no model" because a command failed would be believed (found re-running the book).
+    reason = (done.stderr or done.stdout or "").strip().splitlines()[-1:] or ["no output"]
+    print(f"warning: pipewright {' '.join(args)} failed ({reason[0][:200]}); its cells are empty", file=sys.stderr)
+    return None
 
 
 def table_rows(bq, table: str, sql: str) -> list[dict]:
