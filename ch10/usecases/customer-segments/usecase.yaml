@@ -25,6 +25,7 @@ spec:
   evaluation:
     gates:
       - { metric: davies_bouldin_index, max: 1.5 }   # compact, well separated segments; lower is better
+      - { metric: min_segment_share, min: 0.02 }     # no segment smaller than 2% of the customers (Pipewright 1.4.2)
 
   inference:
     output_table: customer_segments_scores           # each customer's segment and distance to its centre
