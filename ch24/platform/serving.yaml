@@ -1,0 +1,18 @@
+# The platform's serving.yaml for Chapter 24 (the starter's serving.yaml.example, filled in): two private
+# endpoints and one shared pool for the retail team. Copy it beside the starter's terraform.tfvars.
+endpoints:
+  lapse-risk: { tenant: retail, private: true, callers: [] }
+  churn-daily: { tenant: retail, private: true, callers: [] }
+private:
+  subnet: 10.61.0.0/28
+pools:
+  retail-shared:
+    tenant: retail
+    machine: n1-standard-2
+    min_replicas: 1          # production: 2
+    max_replicas: 1
+    cpu_target: 60
+    image: us-docker.pkg.dev/vertex-ai/prediction/pytorch-cpu.2-4:latest
+    network: psc
+    managed_by: ci
+policies: {}

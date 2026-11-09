@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checkout offer</title>
+<style>
+:root { color-scheme: light; --surface:#fcfcfb; --raised:#ffffff; --ink:#0b0b0b; --ink-2:#52514e; --rule:#e4e3df;
+  --accent:#2a78d6; --good:#0ca30c; --serious:#ec835a; }
+@media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { color-scheme: dark; --surface:#1a1a19;
+  --raised:#232322; --ink:#f0efec; --ink-2:#c3c2b7; --rule:#3a3a37; --accent:#3987e5; } }
+:root[data-theme="dark"] { color-scheme: dark; --surface:#1a1a19; --raised:#232322; --ink:#f0efec; --ink-2:#c3c2b7;
+  --rule:#3a3a37; --accent:#3987e5; }
+body { margin:0; background:var(--surface); color:var(--ink); font:15px/1.5 system-ui, sans-serif; }
+main { max-width:760px; margin:0 auto; padding:28px 16px 48px; }
+h1 { font-size:22px; margin:0 0 4px; } .muted { color:var(--ink-2); font-size:13px; }
+form { display:flex; gap:8px; flex-wrap:wrap; margin:20px 0; align-items:center; }
+input[type=text] { font:inherit; padding:8px 10px; border:1px solid var(--rule); border-radius:8px; width:160px;
+  background:var(--raised); color:var(--ink); }
+button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--accent); background:var(--accent);
+  color:#fff; cursor:pointer; } label { font-size:14px; color:var(--ink-2); }
+.verdict { padding:16px 18px; border-radius:10px; border:1px solid var(--rule); background:var(--raised);
+  font-size:18px; font-weight:600; display:none; }
+.verdict .icon { margin-right:8px; } .verdict.yes { border-left:6px solid var(--good); }
+.verdict.no { border-left:6px solid var(--rule); }
+.cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; margin-top:12px; }
+.card { background:var(--raised); border:1px solid var(--rule); border-radius:10px; padding:14px 16px; }
+.card h2 { font-size:14px; margin:0 0 6px; color:var(--ink-2); font-weight:600; }
+.risk { font-size:30px; font-weight:700; } .meter { height:8px; background:var(--rule); border-radius:4px; margin:6px 0 10px;
+  position:relative; } .meter span { position:absolute; left:0; top:0; bottom:0; background:var(--accent); border-radius:4px; }
+.meter i { position:absolute; top:-4px; bottom:-4px; width:2px; background:var(--ink); }
+dl { display:grid; grid-template-columns:auto 1fr; gap:2px 12px; margin:0; font-size:13px; }
+dt { color:var(--ink-2); } dd { margin:0; } .note { font-size:13px; color:var(--ink-2); margin-top:8px; }
+</style></head>
+<body><main>
+<h1>Checkout offer</h1>
+<div class="muted">Should this customer see a "welcome back" offer? The rule: offer when the lapse risk is at least
+{{OFFER_AT}}.</div>
+<form id="f"><input type="text" id="c" placeholder="customer ID" inputmode="numeric" required>
+  <label><input type="checkbox" id="fresh"> fresh score from the endpoint</label>
+  <button>Decide</button></form>
+<div class="verdict" id="v"></div>
+<div class="cards" id="cards"></div>
+<script>
+const threshold = {{OFFER_AT}};
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function card(title, risk, rows, note) {
+  const meter = risk == null ? "" : `<div class="meter"><span style="width:${risk * 100}%"></span>` +
+    `<i style="left:${threshold * 100}%" title="offer threshold"></i></div>`;
+  return `<div class="card"><h2>${esc(title)}</h2><div class="risk">${risk == null ? "–" : risk.toFixed(3)}</div>` +
+    meter + `<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
+    (note ? `<div class="note">${esc(note)}</div>` : "") + `</div>`;
+}
+document.getElementById("f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("c").value.trim(), fresh = document.getElementById("fresh").checked;
+  const v = document.getElementById("v"), cards = document.getElementById("cards");
+  v.style.display = "block"; v.className = "verdict"; v.textContent = "Deciding…"; cards.innerHTML = "";
+  const r = await fetch(`/api/offer/${encodeURIComponent(id)}?fresh_score=${fresh}`);
+  if (!r.ok) { v.textContent = (await r.json()).detail || `HTTP ${r.status}`; return; }
+  const d = await r.json();
+  v.className = "verdict " + (d.offer ? "yes" : "no");
+  v.innerHTML = d.based_on == null ? "No score for this customer: no offer."
+    : `<span class="icon">${d.offer ? "✔" : "–"}</span>${d.offer ? "Show the offer" : "No offer"}` +
+      `<span class="muted"> · based on the ${d.based_on} score</span>`;
+  const w = d.weekly;
+  cards.innerHTML += card("Weekly list", w ? w.lapse_risk : null,
+    w ? [...(w.scored_for ? [["scored for", w.scored_for]] : []), ["model", "v" + w.model_version],
+         ["scored", w.scored_at.slice(0, 16).replace("T", " ")]]
+      : [["", "not on this week's list"]], "One BigQuery lookup; as fresh as the last weekly run.");
+  if (d.fresh) {
+    const f = d.fresh;
+    cards.innerHTML += f.available
+      ? card("Fresh, from the endpoint", f.lapse_risk, [["features as of", f.features_as_of], ["model", "v" + f.model_version],
+          ["endpoint call", f.millis + " ms"], ["filled with median", f.filled_with_median ? (f.filled_with_median.join(", ") || "none") : "by the endpoint, not reported"]],
+          "Features read now and prepared as in training.")
+      : card("Fresh, from the endpoint", null, [["", f.why]], "");
+  }
+});
+// A link can carry the question: /?customer=12350&fresh=1
+const q = new URLSearchParams(location.search);
+if (q.get("customer")) {
+  document.getElementById("c").value = q.get("customer");
+  document.getElementById("fresh").checked = q.get("fresh") === "1";
+  document.getElementById("f").requestSubmit();
+}
+</script>
+</main></body></html>
