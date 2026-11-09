@@ -1,0 +1,34 @@
+# The feature contract (Pipewright 1.4.1, FR-103): the approved definitions of the feature sources
+# this use case reads. Written by `pipewright features contract`; commit it with the use case.
+# Descriptions, sql_file and scheduled_query are yours to edit; the fingerprints are not.
+feature_contract:
+  version: 1.0.0
+  sources:
+  - name: customer_activity
+    kind: table
+    sql_sha256: null
+    schema_sha256: 70e4ad384bf1f2814e6e55e9c2ed734bcba6c8d5c46a5b1a1cfa53bfdc938830
+    schema:
+    - customer_id STRING NULLABLE
+    - feature_timestamp TIMESTAMP NULLABLE
+    - recency_days INTEGER NULLABLE
+    - orders_12m INTEGER NULLABLE
+    - spend_12m_gbp FLOAT NULLABLE
+    - distinct_products INTEGER NULLABLE
+    - avg_days_between_orders FLOAT NULLABLE
+    features:
+      recency_days:
+        description: Days from the customer's last order to the month's cut-off, whole days
+        type: INTEGER
+      orders_12m:
+        description: Orders in the 365 days before the cut-off, cancellations and returns left out
+        type: INTEGER
+      spend_12m_gbp:
+        description: Spend in pounds in the 365 days before the cut-off
+        type: FLOAT
+      distinct_products:
+        description: Different products bought in the 365 days before the cut-off
+        type: INTEGER
+      avg_days_between_orders:
+        description: Average days between orders in the 365 days before the cut-off; empty with one order
+        type: FLOAT
