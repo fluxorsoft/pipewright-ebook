@@ -1,6 +1,6 @@
 # retailer-mlops
 
-The MLOps repository of the UK online gift retailer in *Governed MLOps on Google Cloud*, for Pipewright 1.2.0. Each folder is the whole repository as it stands at the end of one chapter, ready to run: open the folder of
+The MLOps repository of the UK online gift retailer in *Governed MLOps on Google Cloud*, for Pipewright 1.4.2. Each folder is the whole repository as it stands at the end of one chapter, ready to run: open the folder of
 the chapter you are reading and follow its **Try it** section there. Comparing two folders shows exactly what a
 chapter changed, for example `diff -r ch04 ch05`.
 
@@ -24,13 +24,19 @@ chapter changed, for example `diff -r ch04 ch05`.
 | `ch17/` | Chapter 17. Lineage: every model's full story | rows sorted by the contract key before training (exact replays), `data_protection.erasure`, `platform/evidence.tf` (the event log) |
 | `ch18/` | Chapter 18. Evidence, audit and running a fleet | `tools/fleet_report.py`: one HTML page with charts for every use case in every environment (live releases, champions, training runs, drift, compute, decisions) |
 | `ch19/` | Chapter 19. From endpoint to app | `app/`: the checkout offer service (FastAPI): the weekly score, a fresh score from the request-mode endpoint, the business rule `OFFER_AT`, a one-page front end and a `Dockerfile`; `FEATURES=online` asks by customer ID alone, from the online store (Pipewright 1.2.0) |
+| `ch20/` | Chapter 20. Building with a coding agent | the agent's context files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `APP_CONTEXT.md`), the entity table the data team builds (`data-team/sql/retail_entities.sql`) and the use case the agent drafted and you reviewed |
+| (no folder) | Chapter 21. What runs is what was approved | platform settings only (integrity protections in the platform's Terraform): run it from `ch20/` |
+| `ch22/` | Chapter 22. Feature contracts | `config/feature_contract.yaml`: the feature sources' SQL and schemas by fingerprint, version 1.0.0 |
+| `ch23/` | Chapter 23. Online stores and the lookup gateway | each online store set up in the use case (BigQuery with BI Engine, Cloud SQL behind the gateway, your own store) and `team-lookup/`, the team's own store on Cloud Run fed by the Parquet export |
+| `ch24/` | Chapter 24. Private serving and shared machines | `platform/serving.yaml`: two private endpoints and one shared pool, with churn-daily as the pool's neighbour |
 
 Every folder is a Pipewright repository root: run `pipewright` commands from inside it. The chapters were first
-built with Pipewright 1.1.0 and run unchanged on 1.2.0; where 1.2.0 changed something a chapter met, the book says so
-in a note marked **Since Pipewright 1.2.0**.
+built with Pipewright 1.1.0, then every one was run again on 1.4.2; where a later version changed something a chapter
+met, the book says so in a note marked **Since Pipewright 1.2.0** (or the version that changed it). Chapters 20 to 24
+were written on 1.3.0 and 1.4.2.
 
 ```bash
-pip install "pipewright-mlops[gcp]==1.2.0"
+pip install "pipewright-mlops[gcp]==1.4.2"
 cd ch06
 pipewright validate --env test
 pipewright doctor --env test
